@@ -53,8 +53,6 @@ jobs:
 
       - name: set up gcloud sdk
         uses: google-github-actions/setup-gcloud@v2
-        with:
-          project_id: cpg-common
 
       - name: gcloud docker auth
         run: |
@@ -105,8 +103,6 @@ jobs:
 
       - name: set up gcloud sdk
         uses: google-github-actions/setup-gcloud@v2
-        with:
-          project_id: cpg-common
 
       - name: gcloud docker auth
         run: |
