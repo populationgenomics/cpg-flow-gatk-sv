@@ -333,7 +333,7 @@ def queue_annotate_sv_jobs(
 def queue_annotate_strvctvre_job(
     input_vcf,
     output_path: str,
-    job_attrs: dict | None = None,
+    job_attrs: dict,
     name: str = 'AnnotateVcfWithStrvctvre',
 ) -> 'BashJob':
     """
@@ -341,7 +341,7 @@ def queue_annotate_strvctvre_job(
     Args:
         input_vcf (ResourceFile): part of a resource group with the corresponding index
         output_path ():
-        job_attrs (dict|None): job attributes
+        job_attrs (dict): job attributes
         name (str): name of the job
 
     Returns:
