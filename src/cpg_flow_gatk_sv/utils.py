@@ -335,7 +335,7 @@ def queue_annotate_strvctvre_job(
     output_path: str,
     job_attrs: dict | None = None,
     name: str = 'AnnotateVcfWithStrvctvre',
-) -> BashJob:
+) -> 'BashJob':
     """
 
     Args:
