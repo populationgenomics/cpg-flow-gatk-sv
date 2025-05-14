@@ -11,13 +11,13 @@ from cpg_utils.config import config_retrieve
 from cpg_flow_gatk_sv.utils import (
     SV_CALLERS,
 )
-from cpg_flow.targets import Cohort, MultiCohort, SequencingGroup
 from cpg_flow.stage import CohortStage, MultiCohortStage, SequencingGroupStage, stage
 
 from cpg_flow_gatk_sv.jobs.GatherSampleEvidence import create_gather_sample_evidence_jobs
 
 if TYPE_CHECKING:
     from cpg_utils import Path
+    from cpg_flow.targets import SequencingGroup
     from cpg_flow.stage import StageInput, StageOutput
 
 
@@ -38,7 +38,7 @@ class GatherSampleEvidence(SequencingGroupStage):
     https://github.com/broadinstitute/gatk-sv/blob/master/wdl/GatherSampleEvidence.wdl
     """
 
-    def expected_outputs(self, sequencing_group: SequencingGroup) -> 'dict[str, Path]':
+    def expected_outputs(self, sequencing_group: 'SequencingGroup') -> 'dict[str, Path]':
         """
         Expected to produce coverage counts, a VCF for each variant caller,
         and a txt for each type of SV evidence (SR, PE, SD).
@@ -85,7 +85,7 @@ class GatherSampleEvidence(SequencingGroupStage):
 
         return outputs
 
-    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, sequencing_group: 'SequencingGroup', inputs: 'StageInput') -> 'StageOutput':
         """
         Add jobs to batch
         Adds billing-related labels to the Cromwell job(s)
