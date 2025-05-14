@@ -17,11 +17,13 @@ from cpg_utils.hail_batch import command, get_batch
 from cpg_flow.targets import Cohort, Dataset, MultiCohort
 from cpg_flow.utils import make_job_name
 
+
 if TYPE_CHECKING:
     from hailtop.batch.job import BashJob
 
 GATK_SV_COMMIT = 'dc145a52f76a6f425ac3f481171040e78c0cfeea'
 SV_CALLERS = ['manta', 'wham', 'scramble']
+
 _FASTA_STRING = None
 PED_FAMILY_ID_REGEX = re.compile(r'(^[A-Za-z0-9_]+$)')
 
@@ -64,17 +66,6 @@ def create_polling_intervals() -> dict:
         if val := config_retrieve(['cromwell_polling_intervals', job_size.value], False):
             polling_interval_dict[job_size].update(val)
     return polling_interval_dict
-
-
-def get_fasta() -> Path:
-    """
-    find or return the fasta to use
-    """
-    global _FASTA
-    if _FASTA is None:
-        fasta_path = config_retrieve(['workflow', 'ref_fasta'], False) or reference_path('broad/ref_fasta')
-        _FASTA = to_path(fasta_path)
-    return _FASTA
 
 
 def get_fasta_string() -> Path:
@@ -303,7 +294,7 @@ def queue_annotate_sv_jobs(
     input_vcf: Path,
     outputs: dict,
     labels: dict[str, str] | None = None,
-) -> list[Job] | Job | None:
+) -> list['BashJob']:
     """
     Helper function to queue jobs for SV annotation
     Enables common access to the same Annotation WDL for CNV & SV
@@ -344,7 +335,7 @@ def queue_annotate_strvctvre_job(
     output_path: str,
     job_attrs: dict | None = None,
     name: str = 'AnnotateVcfWithStrvctvre',
-) -> Job:
+) -> BashJob:
     """
 
     Args:
@@ -358,7 +349,7 @@ def queue_annotate_strvctvre_job(
     """
 
     job_attrs = job_attrs or {}
-    strv_job = get_batch().new_job('StrVCTVRE', job_attrs | {'tool': 'strvctvre'})
+    strv_job = get_batch().new_bash_job('StrVCTVRE', job_attrs | {'tool': 'strvctvre'})
 
     strv_job.image(image_path('strvctvre'))
     strv_job.storage(config_retrieve(['resource_overrides', name, 'storage'], '10Gi'))

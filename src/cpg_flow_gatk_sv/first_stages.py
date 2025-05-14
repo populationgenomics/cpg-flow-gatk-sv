@@ -6,18 +6,10 @@ from typing import TYPE_CHECKING
 import json
 import logging
 from functools import cache
-from typing import Any
 
-from cpg_utils import to_path
-from cpg_utils.config import AR_GUID_NAME, config_retrieve, try_get_ar_guid
-from cpg_utils.hail_batch import get_batch
+from cpg_utils.config import config_retrieve
 from cpg_flow_gatk_sv.utils import (
     SV_CALLERS,
-    CromwellJobSizes,
-    add_gatk_sv_jobs,
-    get_fasta,
-    get_images,
-    get_references,
 )
 from cpg_flow.targets import Cohort, MultiCohort, SequencingGroup
 from cpg_flow.stage import CohortStage, MultiCohortStage, SequencingGroupStage, stage

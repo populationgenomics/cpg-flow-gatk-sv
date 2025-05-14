@@ -3,15 +3,10 @@
 """
 
 
-from typing import TYPE_CHECKING
-import json
-import logging
-from functools import cache
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from cpg_utils import to_path
 from cpg_utils.config import AR_GUID_NAME, config_retrieve, try_get_ar_guid
-from cpg_utils.hail_batch import get_batch
 from cpg_flow_gatk_sv.utils import (
     SV_CALLERS,
     CromwellJobSizes,
@@ -23,8 +18,7 @@ from cpg_flow_gatk_sv.utils import (
 
 if TYPE_CHECKING:
     from cpg_utils import Path
-    from cpg_flow.stage import StageInput, StageOutput
-    from cpg_flow.targets import Cohort, MultiCohort, SequencingGroup
+    from cpg_flow.targets import SequencingGroup
 
     from hailtop.batch.job import BashJob
 

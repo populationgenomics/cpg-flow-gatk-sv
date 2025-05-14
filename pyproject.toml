@@ -101,6 +101,7 @@ ignore = [
     "PLR0913", # Too many arguments in function (> 5)
     "C901", # method is too complex (> 10 conditions)
     "N999", # invalid module name (not lower-case and potholes)
+    "S311",
 ]
 
 [tool.ruff.lint.isort]
