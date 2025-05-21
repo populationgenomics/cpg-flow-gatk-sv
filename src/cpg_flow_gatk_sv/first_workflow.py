@@ -4,7 +4,7 @@ from argparse import ArgumentParser
 
 from cpg_flow.workflow import run_workflow
 
-from cpg_flow_gatk_sv.first_stages import GatherSampleEvidence
+from cpg_flow_gatk_sv import first_stages
 
 
 def cli_main():
@@ -15,7 +15,7 @@ def cli_main():
     parser.add_argument('--dry_run', action='store_true', help='Dry run')
     args = parser.parse_args()
 
-    stages = [GatherSampleEvidence]
+    stages = [first_stages.EvidenceQC]
 
     run_workflow(stages=stages, dry_run=args.dry_run)
 

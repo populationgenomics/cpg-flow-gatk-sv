@@ -1,10 +1,18 @@
 [workflow]
 name = 'gatk_sv'
 
+check_expected_outputs = true
+
 sequencing_type = 'genome'
-input_cohorts = ['COH5079']
+
+## this was all the copied genomes, some might not work
+#input_cohorts = ['COH5079']
+
+# these are all the genomes which had succeeded
+input_cohorts = ['COH5376']
 
 ref_fasta = 'gs://cpg-common-main/references/hg38/v0/dragen_reference/Homo_sapiens_assembly38_masked.fasta'
+
 status_reporter = 'metamist'
 time_limit_seconds = 86400  # 24 hrs max runtime
 

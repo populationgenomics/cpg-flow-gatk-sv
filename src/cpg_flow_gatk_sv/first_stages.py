@@ -3,42 +3,26 @@ single-sample components of the GATK SV workflow
 """
 
 from typing import TYPE_CHECKING
-import json
-import logging
-from functools import cache
 
-from cpg_utils.config import config_retrieve
-from cpg_flow_gatk_sv.utils import (
-    SV_CALLERS,
-)
-from cpg_flow.stage import CohortStage, MultiCohortStage, SequencingGroupStage, stage
+from cpg_utils import Path, config
+from cpg_flow_gatk_sv import utils
 
-from cpg_flow_gatk_sv.jobs.GatherSampleEvidence import create_gather_sample_evidence_jobs
+from cpg_flow_gatk_sv.jobs import EvidenceQC, GatherSampleEvidence
+
+from cpg_flow import targets, stage
 
 if TYPE_CHECKING:
-    from cpg_utils import Path
     from cpg_flow.targets import SequencingGroup
-    from cpg_flow.stage import StageInput, StageOutput
 
 
-@cache
-def get_sv_callers():
-    if only_jobs := config_retrieve(['workflow', 'GatherSampleEvidence', 'only_jobs'], None):
-        callers = [caller for caller in SV_CALLERS if caller in only_jobs]
-        if not callers:
-            logging.warning('No SV callers enabled')
-        return callers
-    return SV_CALLERS
-
-
-@stage(analysis_keys=[f'{caller}_vcf' for caller in get_sv_callers()] if get_sv_callers() else None, analysis_type='sv')
-class GatherSampleEvidence(SequencingGroupStage):
+@stage.stage(analysis_keys=[f'{caller}_vcf' for caller in utils.get_sv_callers()] if utils.get_sv_callers() else None, analysis_type='sv')
+class GatherSampleEvidence(stage.SequencingGroupStage):
     """
     https://github.com/broadinstitute/gatk-sv#gathersampleevidence
     https://github.com/broadinstitute/gatk-sv/blob/master/wdl/GatherSampleEvidence.wdl
     """
 
-    def expected_outputs(self, sequencing_group: 'SequencingGroup') -> 'dict[str, Path]':
+    def expected_outputs(self, sequencing_group: targets.SequencingGroup) -> dict[str, Path]:
         """
         Expected to produce coverage counts, a VCF for each variant caller,
         and a txt for each type of SV evidence (SR, PE, SD).
@@ -54,7 +38,7 @@ class GatherSampleEvidence(SequencingGroupStage):
 
         prefix = sequencing_group.make_sv_evidence_path
 
-        outputs: dict[str, 'Path'] = {
+        outputs: dict[str, Path] = {
             'coverage_counts': prefix / f'{sequencing_group.id}.coverage_counts.tsv.gz',
             # split reads
             'pesr_split': prefix / f'{sequencing_group.id}.sr.txt.gz',
@@ -68,13 +52,13 @@ class GatherSampleEvidence(SequencingGroupStage):
         }
 
         # Caller's VCFs
-        for caller in get_sv_callers():
+        for caller in utils.get_sv_callers():
             outputs[f'{caller}_vcf'] = prefix / f'{sequencing_group.id}.{caller}.vcf.gz'
             outputs[f'{caller}_index'] = prefix / f'{sequencing_group.id}.{caller}.vcf.gz.tbi'
 
         # TODO This selection process may need to adapt to a new condition...
         # TODO If Scramble is being run, but Manta is not, manta_vcf and index becomes a required input
-        if only_jobs := config_retrieve(['workflow', self.name, 'only_jobs'], None):
+        if only_jobs := config.config_retrieve(['workflow', self.name, 'only_jobs'], None):
             # remove the expected outputs for the jobs that are not in only_jobs
             new_expected = {}
             for job in only_jobs:
@@ -85,7 +69,7 @@ class GatherSampleEvidence(SequencingGroupStage):
 
         return outputs
 
-    def queue_jobs(self, sequencing_group: 'SequencingGroup', inputs: 'StageInput') -> 'StageOutput':
+    def queue_jobs(self, sequencing_group: targets.SequencingGroup, inputs: stage.StageInput) -> stage.StageOutput:
         """
         Add jobs to batch
         Adds billing-related labels to the Cromwell job(s)
@@ -93,75 +77,54 @@ class GatherSampleEvidence(SequencingGroupStage):
 
         outputs = self.expected_outputs(sequencing_group)
 
-        jobs = create_gather_sample_evidence_jobs(
+        jobs = GatherSampleEvidence.create_gather_sample_evidence_jobs(
             sg=sequencing_group,
             expected_outputs=outputs,
         )
         return self.make_outputs(sequencing_group, data=outputs, jobs=jobs)
 
 
-# @stage(required_stages=GatherSampleEvidence, analysis_type='qc', analysis_keys=['qc_table'])
-# class EvidenceQC(CohortStage):
-#     """
-#     https://github.com/broadinstitute/gatk-sv#evidenceqc
-#     """
-#
-#     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-#         """
-#         Expected to return a bunch of batch-level summary files.
-#         """
-#         fname_by_key = {
-#             'ploidy_matrix': 'ploidy_matrix.bed.gz',
-#             'ploidy_plots': 'ploidy_plots.tar.gz',
-#             'WGD_dist': 'WGD_score_distributions.pdf',
-#             'WGD_matrix': 'WGD_scoring_matrix_output.bed.gz',
-#             'WGD_scores': 'WGD_scores.txt.gz',
-#             'bincov_matrix': f'{self.name}.RD.txt.gz',
-#             'bincov_matrix_index': f'{self.name}.RD.txt.gz.tbi',
-#             'bincov_median': 'medianCov.transposed.bed',
-#             'qc_table': 'evidence_qc_table.tsv',
-#         }
-#         for caller in SV_CALLERS:
-#             for k in ['low', 'high']:
-#                 fname_by_key[f'{caller}_qc_{k}'] = f'{caller}_QC.outlier.{k}'
-#
-#         return {key: self.get_stage_cohort_prefix(cohort) / fname for key, fname in fname_by_key.items()}
-#
-#     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
-#         d = inputs.as_dict_by_target(GatherSampleEvidence)
-#         sgids = cohort.get_sequencing_group_ids()
-#
-#         input_dict: dict[str, Any] = {
-#             'batch': cohort.id,
-#             'samples': sgids,
-#             'run_vcf_qc': True,
-#             'counts': [str(d[sid]['coverage_counts']) for sid in sgids],
-#         }
-#         for caller in SV_CALLERS:
-#             input_dict[f'{caller}_vcfs'] = [str(d[sid][f'{caller}_vcf']) for sid in sgids]
-#
-#         input_dict |= get_images(
-#             ['sv_base_mini_docker', 'sv_base_docker', 'sv_pipeline_docker', 'sv_pipeline_qc_docker'],
-#         )
-#
-#         input_dict |= get_references(['genome_file', 'wgd_scoring_mask'])
-#
-#         expected_d = self.expected_outputs(cohort)
-#
-#         billing_labels = {'stage': self.name.lower(), AR_GUID_NAME: try_get_ar_guid()}
-#
-#         # runs for approx 5 hours, depending on sample count
-#         jobs = add_gatk_sv_jobs(
-#             dataset=cohort.analysis_dataset,
-#             wfl_name=self.name,
-#             input_dict=input_dict,
-#             expected_out_dict=expected_d,
-#             labels=billing_labels,
-#             job_size=CromwellJobSizes.MEDIUM,
-#         )
-#         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
-#
-#
+@stage.stage(required_stages=GatherSampleEvidence, analysis_type='qc', analysis_keys=['qc_table'])
+class EvidenceQC(stage.CohortStage):
+    """
+    https://github.com/broadinstitute/gatk-sv#evidenceqc
+    """
+
+    def expected_outputs(self, cohort: targets.Cohort) -> dict[str, Path]:
+        """
+        Expected to return a bunch of batch-level summary files.
+        """
+        fname_by_key = {
+            'ploidy_matrix': 'ploidy_matrix.bed.gz',
+            'ploidy_plots': 'ploidy_plots.tar.gz',
+            'WGD_dist': 'WGD_score_distributions.pdf',
+            'WGD_matrix': 'WGD_scoring_matrix_output.bed.gz',
+            'WGD_scores': 'WGD_scores.txt.gz',
+            'bincov_matrix': f'{self.name}.RD.txt.gz',
+            'bincov_matrix_index': f'{self.name}.RD.txt.gz.tbi',
+            'bincov_median': 'medianCov.transposed.bed',
+            'qc_table': 'evidence_qc_table.tsv',
+        }
+        for caller in utils.SV_CALLERS:
+            for k in ['low', 'high']:
+                fname_by_key[f'{caller}_qc_{k}'] = f'{caller}_QC.outlier.{k}'
+
+        return {key: self.get_stage_cohort_prefix(cohort) / fname for key, fname in fname_by_key.items()}
+
+    def queue_jobs(self, cohort: targets.Cohort, inputs: stage.StageInput) -> stage.StageOutput:
+        outputs = self.expected_outputs(cohort)
+
+        input_dict = inputs.as_dict_by_target(GatherSampleEvidence)
+
+        jobs = EvidenceQC.create_evidence_qc_jobs(
+            input_dict=input_dict,
+            output_dict=outputs,
+            cohort=cohort
+        )
+
+        return self.make_outputs(cohort, data=outputs, jobs=jobs)
+
+
 # @stage(required_stages=EvidenceQC, analysis_type='sv', analysis_keys=['batch_json'])
 # class CreateSampleBatches(MultiCohortStage):
 #     """

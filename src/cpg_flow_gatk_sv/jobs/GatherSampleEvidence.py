@@ -19,7 +19,6 @@ from cpg_flow_gatk_sv.utils import (
 if TYPE_CHECKING:
     from cpg_utils import Path
     from cpg_flow.targets import SequencingGroup
-
     from hailtop.batch.job import BashJob
 
 
