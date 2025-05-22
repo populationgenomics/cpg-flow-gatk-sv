@@ -22,7 +22,8 @@ classifiers=[
 
 dependencies=[
     'cpg-flow>=v0.2.4',
-    "hatchling>=1.27.0",
+    'fsspec',
+    'hatchling>=1.27.0',
 ]
 
 [project.urls]
