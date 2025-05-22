@@ -1,9 +1,8 @@
 from typing import TYPE_CHECKING, Any
 
 from cpg_flow import targets
-from cpg_utils import Path, config, to_path
-
 from cpg_flow_gatk_sv import utils
+from cpg_utils import Path, config, to_path
 
 if TYPE_CHECKING:
     from hailtop.batch.job import BashJob

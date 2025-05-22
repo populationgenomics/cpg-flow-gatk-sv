@@ -10,6 +10,7 @@ from random import randint
 from typing import TYPE_CHECKING, Any
 
 import loguru
+
 from cpg_flow import targets, utils
 from cpg_utils import Path, config, cromwell, hail_batch, to_path
 

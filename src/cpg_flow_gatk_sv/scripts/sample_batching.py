@@ -7,8 +7,9 @@ from argparse import ArgumentParser
 
 import numpy as np
 import pandas as pd
-from cpg_utils import config, to_path
 from loguru import logger
+
+from cpg_utils import config, to_path
 
 SEX_VALS = {'male', 'female'}
 

@@ -3,10 +3,9 @@ single-sample components of the GATK SV workflow
 """
 
 from cpg_flow import stage, targets
-from cpg_utils import Path, config
-
 from cpg_flow_gatk_sv import utils
 from cpg_flow_gatk_sv.jobs import CreateSampleBatches, EvidenceQC, GatherSampleEvidence
+from cpg_utils import Path, config
 
 
 @stage.stage(

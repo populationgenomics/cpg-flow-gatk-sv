@@ -2,10 +2,10 @@ import json
 from typing import TYPE_CHECKING
 
 import loguru
-from cpg_flow import workflow
-from cpg_utils import Path, config, hail_batch, to_path
 
+from cpg_flow import workflow
 from cpg_flow_gatk_sv.scripts import sample_batching
+from cpg_utils import Path, config, hail_batch, to_path
 
 if TYPE_CHECKING:
     from hailtop.batch.job import BashJob

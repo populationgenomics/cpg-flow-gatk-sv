@@ -3,7 +3,6 @@
 from argparse import ArgumentParser
 
 from cpg_flow.workflow import run_workflow
-
 from cpg_flow_gatk_sv import first_stages
 
 
