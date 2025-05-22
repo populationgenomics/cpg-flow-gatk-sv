@@ -45,7 +45,7 @@ def create_evidence_qc_jobs(
     cromwell_input_dict |= utils.get_references(['genome_file', 'wgd_scoring_mask'])
 
     # runs for approx 5 hours, depending on sample count
-    jobs = utils.add_gatk_sv_jobs(
+    return utils.add_gatk_sv_jobs(
         dataset=cohort.dataset,
         wfl_name='EvidenceQC',
         input_dict=cromwell_input_dict,
@@ -53,4 +53,3 @@ def create_evidence_qc_jobs(
         labels={'stage': 'EvidenceQC', AR_GUID_NAME: try_get_ar_guid()},
         job_size=utils.CromwellJobSizes.MEDIUM,
     )
-    return jobs
