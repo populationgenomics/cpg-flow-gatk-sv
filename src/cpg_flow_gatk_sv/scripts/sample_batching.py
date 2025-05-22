@@ -73,10 +73,10 @@ def batch_sgs(md: pd.DataFrame, min_batch_size: int, max_batch_size: int) -> lis
                 'mf_ratio': is_male.sum() / is_female.sum(),
                 'batch_median_coverage': md.median_coverage.median(),
                 'coverage_range': (md.median_coverage.min(), md.median_coverage.max()),
-                'sequencing_groups': md.ID.tolist(),
+                'sequencing_groups': md.sample_id.tolist(),
                 'coverage_medians': md.median_coverage.tolist(),
-                'male': md[~is_female].ID.to_list(),
-                'female': md[is_female].ID.to_list(),
+                'male': md[~is_female].sample_id.to_list(),
+                'female': md[is_female].sample_id.to_list(),
             },
         ]
 
@@ -135,10 +135,10 @@ def batch_sgs(md: pd.DataFrame, min_batch_size: int, max_batch_size: int) -> lis
                 'mf_ratio': (len(md_sex_cov['male'][cov]) or 1) / (len(md_sex_cov['female'][cov]) or 1),
                 'batch_median_coverage': sample_ids.median_coverage.median(),
                 'coverage_range': (sample_ids.median_coverage.min(), sample_ids.median_coverage.max()),
-                'sequencing_groups': sample_ids.ID.tolist(),
+                'sequencing_groups': sample_ids.sample_id.tolist(),
                 'coverage_medians': sample_ids.median_coverage.tolist(),
-                'male': md_sex_cov['male'][cov].ID.tolist(),
-                'female': md_sex_cov['female'][cov].ID.tolist(),
+                'male': md_sex_cov['male'][cov].sample_id.tolist(),
+                'female': md_sex_cov['female'][cov].sample_id.tolist(),
             },
         )
 
@@ -178,7 +178,7 @@ def add_sg_meta_fields(sg_df: pd.DataFrame, sg_meta: dict[str, dict]) -> pd.Data
 
     Args:
         sg_df (pd.DataFrame): DataFrame of sequencing groups
-        sg_meta (dict[str, dict]): meta dict keyed by SG ID
+        sg_meta (dict[str, dict]): meta dict keyed by SG sample_id
 
     Returns:
         pd.DataFrame: DataFrame with the sg_meta fields parsed and added
