@@ -31,18 +31,22 @@ run_module_metrics = false
 # cloned over from the GATK-SV config values
 cloud_sdk_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/cloud-sdk"
 cnmops_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/cnmops:2024-11-08-v1.0-62adb329"
+condense_counts_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/gatk:4.2.6.1-57-g9e03432"
+denovo = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/denovo:2025-03-25-v1.0.2-hotfix-65eddd78"
 gatk_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/gatk:2024-12-05-4.6.1.0-6-gfc248dfc1-NIGHTLY-SNAPSHOT"
 gatk_docker_pesr_override = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/gatk:4.2.6.1-57-g9e03432"
 genomes_in_the_cloud_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/genomes-in-the-cloud:2.3.2-1510681135"
+gq_recalibrator_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/gatk:mw-tb-form-sv-filter-training-data-899360a"
 linux_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/ubuntu1804"
 manta_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/manta:2023-09-14-v0.28.3-beta-3f22f94d"
-scramble_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/scramble:2024-10-25-v0.29-beta-5ea22a52"
 samtools_cloud_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/samtools-cloud:2024-10-25-v0.29-beta-5ea22a52"
+scramble_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/scramble:2024-10-25-v0.29-beta-5ea22a52"
+str = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/str:2023-05-23-v0.27.3-beta-e537bdd6"
+sv_base_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/sv-base:2024-10-25-v0.29-beta-5ea22a52"
 sv_base_mini_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/sv-base-mini:2024-10-25-v0.29-beta-5ea22a52"
 sv_pipeline_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/sv-pipeline:2025-03-25-v1.0.2-hotfix-65eddd78"
+sv_pipeline_qc_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/sv-pipeline:2025-03-25-v1.0.2-hotfix-65eddd78"
 wham_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/wham:2024-10-25-v0.29-beta-5ea22a52"
-str = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/str:2023-05-23-v0.27.3-beta-e537bdd6"
-denovo = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/denovo:2025-03-25-v1.0.2-hotfix-65eddd78"
 
 # resource overrides for the GatherSampleEvidence stage
 [resource_overrides.GatherSampleEvidence.runtime_attr_scramble_part1]
@@ -59,3 +63,9 @@ disk_gb = 40
 
 [resource_overrides.EvidenceQC.runtime_attr_mediancov]
 disk_gb = 200
+
+[hail]
+billing_project = "test-vcgs-dataset"
+delete_scratch_on_exit = true
+dry_run = true
+backend = "local"
