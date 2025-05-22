@@ -5,7 +5,8 @@ ENV PYTHONDONTWRITEBYTECODE=1
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y \
         curl \
-        git && \
+        git \
+        jq && \
     rm -r /var/lib/apt/lists/* && \
     rm -r /var/cache/apt/*
 
