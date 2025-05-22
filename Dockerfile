@@ -2,6 +2,12 @@ FROM australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_hail_gcloud:0.2.1
 
 ENV PYTHONDONTWRITEBYTECODE=1
 
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y \
+        git && \
+    rm -r /var/lib/apt/lists/* && \
+    rm -r /var/cache/apt/*
+
 # now do some fun stuff, installing ClinvArbitration
 WORKDIR /cpg_flow_gatk_sv
 
