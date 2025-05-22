@@ -7,7 +7,7 @@ from argparse import ArgumentParser
 
 import numpy as np
 import pandas as pd
-from cpg_utils import to_path
+from cpg_utils import config, to_path
 from loguru import logger
 
 SEX_VALS = {'male', 'female'}
@@ -116,7 +116,7 @@ def batch_sgs(md: pd.DataFrame, min_batch_size: int, max_batch_size: int) -> lis
     # create batches
     batches = []
     for cov in range(cov_bins):
-        sample_ids = pd.concat([md_sex_cov['male'][cov], md_sex_cov['female'][cov]])  # type: ignore
+        sample_ids = pd.concat([md_sex_cov['male'][cov], md_sex_cov['female'][cov]])
         logger.info(
             f"""
         ---
@@ -137,8 +137,8 @@ def batch_sgs(md: pd.DataFrame, min_batch_size: int, max_batch_size: int) -> lis
                 'coverage_range': (sample_ids.median_coverage.min(), sample_ids.median_coverage.max()),
                 'sequencing_groups': sample_ids.ID.tolist(),
                 'coverage_medians': sample_ids.median_coverage.tolist(),
-                'male': md_sex_cov['male'][cov].ID.tolist(),  # type: ignore
-                'female': md_sex_cov['female'][cov].ID.tolist(),  # type: ignore
+                'male': md_sex_cov['male'][cov].ID.tolist(),
+                'female': md_sex_cov['female'][cov].ID.tolist(),
             },
         )
 
@@ -196,8 +196,6 @@ def partition_batches(
     metadata_files: list[str],
     sequencing_groups_json: str,
     output_json: str,
-    min_batch_size: int,
-    max_batch_size: int,
 ):
     """
     Runs this process
@@ -210,23 +208,24 @@ def partition_batches(
         metadata_files (list[str]): paths to the metadata files
         sequencing_groups_json (str): path to json of all SGs with their meta
         output_json (str): location to write the batch result
-        min_batch_size (int): minimum batch size
-        max_batch_size (int): maximum batch size
     """
+
+    min_batch_size = config.config_retrieve(['workflow', 'min_batch_size'], 100)
+    max_batch_size = config.config_retrieve(['workflow', 'max_batch_size'], 300)
 
     # read in the metadata contents
     logger.info('Starting the batch creation process')
 
     # load in the metadata files
     md = pd.concat([pd.read_csv(md_file, sep='\t', low_memory=False) for md_file in metadata_files])
-    md.columns = [x.replace('#', '') for x in md.columns]  # type: ignore
+    md.columns = [x.replace('#', '') for x in md.columns]
 
     # load the sequencing groups
     with to_path(sequencing_groups_json).open('r') as f:
         sequencing_groups = json.load(f)
 
     # filter to the PCR-state SGs we're interested in
-    sample_ids = list(sequencing_groups.keys())
+    sample_ids = list(sequencing_groups.keys())  # noqa: F841
     md = md.query('ID in @sample_ids')
     md = add_sg_meta_fields(md, sequencing_groups)
 
@@ -248,4 +247,12 @@ def partition_batches(
 
 if __name__ == '__main__':
     parser = ArgumentParser()
-    # TODO
+    parser.add_argument('--qc_tables', type=str, nargs='+', required=True)
+    parser.add_argument('--sgs_json', type=str, required=True)
+    parser.add_argument('--output_json', type=str, required=True)
+    args = parser.parse_args()
+    partition_batches(
+        metadata_files=args.qc_tables,
+        sequencing_groups_json=args.sgs_json,
+        output_json=args.output_json,
+    )

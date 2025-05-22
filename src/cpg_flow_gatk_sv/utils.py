@@ -112,10 +112,8 @@ def get_references(keys: list[str | dict[str, str]]) -> dict[str, str | list[str
     res: dict[str, str | list[str]] = {}
     for key in keys:
         # Keys can be maps (e.g. {'MakeCohortVcf.cytobands': 'cytoband'})
-        if isinstance(key, dict):
-            key, ref_d_key = next(iter(key.items()))
-        else:
-            ref_d_key = key
+        ref_d_key = next(iter(key.values())) if isinstance(key, dict) else key
+
         # e.g. GATKSVPipelineBatch.rmsk -> rmsk
         ref_d_key = ref_d_key.split('.')[-1]
         try:
@@ -367,9 +365,9 @@ def queue_annotate_strvctvre_job(
 
     # run strvctvre
     strv_job.command(
-        f'python StrVCTVRE.py -i {input_vcf} -o {strv_job.output["vcf.gz"]} -f vcf -p {local_phylop}',  # type: ignore
+        f'python StrVCTVRE.py -i {input_vcf} -o {strv_job.output["vcf.gz"]} -f vcf -p {local_phylop}',
     )
-    strv_job.command(f'tabix {strv_job.output["vcf.gz"]}')  # type: ignore
+    strv_job.command(f'tabix {strv_job.output["vcf.gz"]}')
 
     hail_batch.get_batch().write_output(strv_job.output, str(output_path).replace('.vcf.gz', ''))
     return strv_job

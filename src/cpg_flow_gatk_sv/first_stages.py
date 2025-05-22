@@ -2,12 +2,11 @@
 single-sample components of the GATK SV workflow
 """
 
-
 from cpg_flow import stage, targets
 from cpg_utils import Path, config
 
 from cpg_flow_gatk_sv import utils
-from cpg_flow_gatk_sv.jobs import EvidenceQC, GatherSampleEvidence
+from cpg_flow_gatk_sv.jobs import CreateSampleBatches, EvidenceQC, GatherSampleEvidence
 
 
 @stage.stage(
@@ -119,66 +118,41 @@ class EvidenceQCStage(stage.CohortStage):
         return self.make_outputs(cohort, data=outputs, jobs=jobs)
 
 
-# @stage(required_stages=EvidenceQC, analysis_type='sv', analysis_keys=['batch_json'])
-# class CreateSampleBatches(MultiCohortStage):
-#     """
-#     uses the values generated in EvidenceQC
-#     splits the sequencing groups into batches based on median coverage,
-#     PCR +/- status, and Sex
-#
-#     The output of this Stage will contain the distinct SG batches to use for the
-#     following series of Stages. For now, standard practice is to create a separate
-#     minimal configuration file for each sub-batch, containing the list of SG IDs
-#     as the `only_sgs` key. The gatk_sv_multisample_1 and gatk_sv_sandwich WFs are
-#     then run separately for each sub-batch, with the active SGs controlled via the
-#     config contents.
-#
-#     The output of this stage is used to generate custom cohorts
-#     """
-#
-#     def expected_outputs(self, multicohort: MultiCohort) -> dict:
-#         return {'batch_json': self.prefix / 'sgid_batches.json'}
-#
-#     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
-#         """
-#         this stage has been clarified - this will only run on Genomes
-#         Exomes were never a supported case, they have a separate pipeline
-#         """
-#
-#         expected = self.expected_outputs(multicohort)
-#
-#         if config_retrieve(['workflow', 'sequencing_type']) != 'genome':
-#             raise RuntimeError('This workflow is not intended for Exome data')
-#
-#         # get the batch size parameters
-#         min_batch_size = config_retrieve(['workflow', 'min_batch_size'], 100)
-#         max_batch_size = config_retrieve(['workflow', 'max_batch_size'], 300)
-#
-#         # Get the sequencing groups
-#         sequencing_groups = {
-#             sequencing_group.id: sequencing_group.meta for sequencing_group in multicohort.get_sequencing_groups()
-#         }
-#         if len(sequencing_groups) < min_batch_size:
-#             logging.error('Too few sequencing groups to form batches')
-#             raise RuntimeError('too few samples to create batches')
-#
-#         # write them to a json file in tmp
-#         sgs_json_path = to_path(self.tmp_prefix / 'sgs_meta.json')
-#         with sgs_json_path.open('w') as f:
-#             json.dump(sequencing_groups, f)
-#
-#         # Get the QC tables for each input cohort
-#         qc_tables = [inputs.as_dict(cohort, EvidenceQC)['qc_table'] for cohort in multicohort.get_cohorts()]
-#
-#         py_job = get_batch().new_python_job('create_sample_batches')
-#         py_job.image(config_retrieve(['workflow', 'driver_image']))
-#         py_job.call(
-#             sample_batching.partition_batches,
-#             qc_tables,
-#             sgs_json_path,
-#             str(expected['batch_json']),
-#             min_batch_size,
-#             max_batch_size,
-#         )
-#
-#         return self.make_outputs(multicohort, data=expected, jobs=py_job)
+@stage.stage(
+    required_stages=EvidenceQCStage,
+    analysis_type='sv',
+)
+class CreateSampleBatchesStage(stage.MultiCohortStage):
+    """
+    uses the values generated in EvidenceQC
+    splits the sequencing groups into batches based on median coverage,
+    PCR +/- status, and Sex
+
+    The output of this Stage will contain the distinct SG batches to use for the
+    following series of Stages. For now, standard practice is to create a separate
+    minimal configuration file for each sub-batch, containing the list of SG IDs
+    as the `only_sgs` key. The gatk_sv_multisample_1 and gatk_sv_sandwich WFs are
+    then run separately for each sub-batch, with the active SGs controlled via the
+    config contents.
+
+    The output of this stage is used to generate custom cohorts
+    """
+
+    def expected_outputs(self, multicohort: targets.MultiCohort) -> Path:
+        return self.prefix / 'sgid_batches.json'
+
+    def queue_jobs(self, multicohort: targets.MultiCohort, inputs: stage.StageInput) -> stage.StageOutput:
+        """
+        this stage has been clarified - this will only run on Genomes
+        Exomes were never a supported case, they have a separate pipeline
+        """
+
+        output = self.expected_outputs(multicohort)
+
+        job = CreateSampleBatches.create_sample_batches(
+            qc_tables=[inputs.as_dict(cohort, EvidenceQCStage)['qc_table'] for cohort in multicohort.get_cohorts()],
+            tmp_prefix=self.tmp_prefix,
+            output_json=str(output),
+        )
+
+        return self.make_outputs(multicohort, data=output, jobs=job)

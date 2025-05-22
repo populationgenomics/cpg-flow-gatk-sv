@@ -1,40 +1,28 @@
-"""
-
-"""
-
-
 from typing import TYPE_CHECKING, Any
 
-from cpg_utils import to_path
-from cpg_utils.config import AR_GUID_NAME, config_retrieve, try_get_ar_guid
+from cpg_flow import targets
+from cpg_utils import Path, config, to_path
 
-from cpg_flow_gatk_sv.utils import (
-    SV_CALLERS,
-    CromwellJobSizes,
-    add_gatk_sv_jobs,
-    get_fasta_string,
-    get_images,
-    get_references,
-)
+from cpg_flow_gatk_sv import utils
 
 if TYPE_CHECKING:
-    from cpg_flow.targets import SequencingGroup
-    from cpg_utils import Path
     from hailtop.batch.job import BashJob
 
 
 STAGE_NAME: str = 'GatherSampleEvidence'
 
 
-def create_gather_sample_evidence_jobs(sg: 'SequencingGroup', expected_outputs: 'dict[str, Path]') -> list['BashJob']:
-
-    fasta_file = get_fasta_string()
+def create_gather_sample_evidence_jobs(
+    sg: targets.SequencingGroup,
+    expected_outputs: dict[str, Path],
+) -> list['BashJob']:
+    fasta_file = utils.get_fasta_string()
 
     input_dict: dict[str, Any] = {
         'bam_or_cram_file': str(sg.cram),
         'bam_or_cram_index': str(sg.cram) + '.crai',
         'sample_id': sg.id,
-        'reference_fasta':fasta_file,
+        'reference_fasta': fasta_file,
         'reference_index': f'{fasta_file}.fai',
         'reference_dict': to_path(fasta_file).with_suffix('.dict'),
         'reference_version': '38',
@@ -45,7 +33,7 @@ def create_gather_sample_evidence_jobs(sg: 'SequencingGroup', expected_outputs: 
     # If DRAGEN input is going to be used, first the input parameter 'is_dragen_3_7_8' needs to be set to True
     # then some parameters need to be added to the input_dict to enable BWA to be run
 
-    input_dict |= get_images(
+    input_dict |= utils.get_images(
         [
             'sv_pipeline_docker',
             'sv_base_mini_docker',
@@ -59,7 +47,7 @@ def create_gather_sample_evidence_jobs(sg: 'SequencingGroup', expected_outputs: 
             'cloud_sdk_docker',
         ],
     )
-    input_dict |= get_references(
+    input_dict |= utils.get_references(
         [
             'primary_contigs_fai',
             'primary_contigs_list',
@@ -72,7 +60,7 @@ def create_gather_sample_evidence_jobs(sg: 'SequencingGroup', expected_outputs: 
         ],
     )
 
-    if only_jobs := config_retrieve(['workflow', STAGE_NAME, 'only_jobs'], None):
+    if only_jobs := config.config_retrieve(['workflow', STAGE_NAME, 'only_jobs'], None):
         # if only_jobs is set, only run the specified jobs
         # this is useful for samples which need to re-run specific jobs
         # e.g. if manta failed and needs to be re-run with more memory
@@ -85,7 +73,7 @@ def create_gather_sample_evidence_jobs(sg: 'SequencingGroup', expected_outputs: 
 
         # disable the caller jobs that are not in only_jobs by nulling their docker image
         for key, val in input_dict.items():
-            if key in [f'{caller}_docker' for caller in SV_CALLERS]:
+            if key in [f'{caller}_docker' for caller in utils.SV_CALLERS]:
                 caller = key.removesuffix('_docker')
                 input_dict[key] = val if caller in only_jobs else None
 
@@ -96,7 +84,7 @@ def create_gather_sample_evidence_jobs(sg: 'SequencingGroup', expected_outputs: 
         'dataset': sg.dataset.name,  # already lowercase
         'sequencing-group': sg.id.lower(),
         'stage': STAGE_NAME.lower(),
-        AR_GUID_NAME: try_get_ar_guid(),
+        config.AR_GUID_NAME: config.try_get_ar_guid(),
     }
 
     # add some max-polling interval jitter for each sample
@@ -104,12 +92,12 @@ def create_gather_sample_evidence_jobs(sg: 'SequencingGroup', expected_outputs: 
     # this is used to determine how often to poll Cromwell for completion status
     # we alter the per-sample maximum to be between 5 and 30 minutes for this
     # long-running job, so samples poll on different intervals, spreading load
-    return add_gatk_sv_jobs(
+    return utils.add_gatk_sv_jobs(
         dataset=sg.dataset,
         wfl_name=STAGE_NAME,
         input_dict=input_dict,
         expected_out_dict=expected_outputs,
         sequencing_group_id=sg.id,
         labels=billing_labels,
-        job_size=CromwellJobSizes.LARGE,
+        job_size=utils.CromwellJobSizes.LARGE,
     )

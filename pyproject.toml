@@ -102,7 +102,11 @@ ignore = [
     "C901", # method is too complex (> 10 conditions)
     "N999", # invalid module name (not lower-case and potholes)
     "S311",
+    "PLR2004", # Magic value used in comparison, consider replacing `X` with a constant variable
 ]
 
 [tool.ruff.lint.isort]
 section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/cpg_flow_gatk_sv/first_stages.py" = ["ARG002"]
