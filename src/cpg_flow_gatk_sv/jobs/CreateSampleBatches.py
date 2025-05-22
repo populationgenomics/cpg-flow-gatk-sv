@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 
 def create_sample_batches(
-    qc_tables: list[Path],
+    qc_tables: list[str],
     tmp_prefix: Path,
     output_json: str,
 ) -> 'BashJob':

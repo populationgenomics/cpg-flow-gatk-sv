@@ -150,7 +150,7 @@ class CreateSampleBatchesStage(stage.MultiCohortStage):
         output = self.expected_outputs(multicohort)
 
         job = CreateSampleBatches.create_sample_batches(
-            qc_tables=[inputs.as_dict(cohort, EvidenceQCStage)['qc_table'] for cohort in multicohort.get_cohorts()],
+            qc_tables=[inputs.as_str(cohort, EvidenceQCStage, 'qc_table') for cohort in multicohort.get_cohorts()],
             tmp_prefix=self.tmp_prefix,
             output_json=str(output),
         )
