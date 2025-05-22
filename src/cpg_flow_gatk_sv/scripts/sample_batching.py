@@ -5,12 +5,10 @@ extract from Broad sample batching script for GATK-SV
 import json
 from argparse import ArgumentParser
 
-from loguru import logger
 import numpy as np
 import pandas as pd
-
 from cpg_utils import to_path
-
+from loguru import logger
 
 SEX_VALS = {'male', 'female'}
 
@@ -250,5 +248,4 @@ def partition_batches(
 
 if __name__ == '__main__':
     parser = ArgumentParser()
-    ...
     # TODO

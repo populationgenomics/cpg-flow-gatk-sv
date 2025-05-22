@@ -2,21 +2,19 @@
 single-sample components of the GATK SV workflow
 """
 
-from typing import TYPE_CHECKING
 
+from cpg_flow import stage, targets
 from cpg_utils import Path, config
-from cpg_flow_gatk_sv import utils
 
+from cpg_flow_gatk_sv import utils
 from cpg_flow_gatk_sv.jobs import EvidenceQC, GatherSampleEvidence
 
-from cpg_flow import targets, stage
 
-if TYPE_CHECKING:
-    from cpg_flow.targets import SequencingGroup
-
-
-@stage.stage(analysis_keys=[f'{caller}_vcf' for caller in utils.get_sv_callers()] if utils.get_sv_callers() else None, analysis_type='sv')
-class GatherSampleEvidence(stage.SequencingGroupStage):
+@stage.stage(
+    analysis_keys=[f'{caller}_vcf' for caller in utils.get_sv_callers()] if utils.get_sv_callers() else None,
+    analysis_type='sv',
+)
+class GatherSampleEvidenceStage(stage.SequencingGroupStage):
     """
     https://github.com/broadinstitute/gatk-sv#gathersampleevidence
     https://github.com/broadinstitute/gatk-sv/blob/master/wdl/GatherSampleEvidence.wdl
@@ -84,8 +82,8 @@ class GatherSampleEvidence(stage.SequencingGroupStage):
         return self.make_outputs(sequencing_group, data=outputs, jobs=jobs)
 
 
-@stage.stage(required_stages=GatherSampleEvidence, analysis_type='qc', analysis_keys=['qc_table'])
-class EvidenceQC(stage.CohortStage):
+@stage.stage(required_stages=GatherSampleEvidenceStage, analysis_type='qc', analysis_keys=['qc_table'])
+class EvidenceQCStage(stage.CohortStage):
     """
     https://github.com/broadinstitute/gatk-sv#evidenceqc
     """
@@ -114,13 +112,9 @@ class EvidenceQC(stage.CohortStage):
     def queue_jobs(self, cohort: targets.Cohort, inputs: stage.StageInput) -> stage.StageOutput:
         outputs = self.expected_outputs(cohort)
 
-        input_dict = inputs.as_dict_by_target(GatherSampleEvidence)
+        input_dict = inputs.as_dict_by_target(GatherSampleEvidenceStage)
 
-        jobs = EvidenceQC.create_evidence_qc_jobs(
-            input_dict=input_dict,
-            output_dict=outputs,
-            cohort=cohort
-        )
+        jobs = EvidenceQC.create_evidence_qc_jobs(input_dict=input_dict, output_dict=outputs, cohort=cohort)
 
         return self.make_outputs(cohort, data=outputs, jobs=jobs)
 

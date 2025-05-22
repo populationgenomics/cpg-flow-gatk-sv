@@ -3,10 +3,11 @@
 """
 
 
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from cpg_utils import to_path
 from cpg_utils.config import AR_GUID_NAME, config_retrieve, try_get_ar_guid
+
 from cpg_flow_gatk_sv.utils import (
     SV_CALLERS,
     CromwellJobSizes,
@@ -17,8 +18,8 @@ from cpg_flow_gatk_sv.utils import (
 )
 
 if TYPE_CHECKING:
-    from cpg_utils import Path
     from cpg_flow.targets import SequencingGroup
+    from cpg_utils import Path
     from hailtop.batch.job import BashJob
 
 

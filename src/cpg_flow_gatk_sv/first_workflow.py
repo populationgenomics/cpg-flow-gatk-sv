@@ -15,7 +15,7 @@ def cli_main():
     parser.add_argument('--dry_run', action='store_true', help='Dry run')
     args = parser.parse_args()
 
-    stages = [first_stages.EvidenceQC]
+    stages = [first_stages.EvidenceQCStage]
 
     run_workflow(stages=stages, dry_run=args.dry_run)
 

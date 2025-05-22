@@ -1,21 +1,20 @@
-"""
-
-"""
-
+""" """
 
 from typing import TYPE_CHECKING
 
+from cpg_flow import targets
 from cpg_utils import Path
 from cpg_utils.config import AR_GUID_NAME, try_get_ar_guid
 
-from cpg_flow import targets
 from cpg_flow_gatk_sv import utils
 
 if TYPE_CHECKING:
     from hailtop.batch.job import BashJob
 
 
-def create_evidence_qc_jobs(input_dict: dict[str, Path], output_dict: dict[str, Path], cohort: targets.Cohort) -> list[BashJob]:
+def create_evidence_qc_jobs(
+    input_dict: dict[str, Path], output_dict: dict[str, Path], cohort: targets.Cohort
+) -> list['BashJob']:
     """
 
     Args:

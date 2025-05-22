@@ -1,19 +1,17 @@
 """
 Common methods for all GATK-SV workflows
 """
-from typing import TYPE_CHECKING
 
 import re
 from enum import Enum
 from functools import cache
 from os.path import join
 from random import randint
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
 import loguru
-
-from cpg_utils import Path, to_path, config, cromwell, hail_batch
 from cpg_flow import targets, utils
-
+from cpg_utils import Path, config, cromwell, hail_batch, to_path
 
 if TYPE_CHECKING:
     from hailtop.batch.job import BashJob
@@ -115,7 +113,7 @@ def get_references(keys: list[str | dict[str, str]]) -> dict[str, str | list[str
     for key in keys:
         # Keys can be maps (e.g. {'MakeCohortVcf.cytobands': 'cytoband'})
         if isinstance(key, dict):
-            key, ref_d_key = list(key.items())[0]
+            key, ref_d_key = next(iter(key.items()))
         else:
             ref_d_key = key
         # e.g. GATKSVPipelineBatch.rmsk -> rmsk
@@ -160,10 +158,12 @@ def add_gatk_sv_jobs(
     if sequencing_group_id:
         output_prefix = join(output_prefix, sequencing_group_id)
 
-    outputs_to_collect = dict()
+    outputs_to_collect = {}
     for key, value in expected_out_dict.items():
         if isinstance(value, list):
-            outputs_to_collect[key] = cromwell.CromwellOutputType.array_path(name=f'{wfl_name}.{key}', length=len(value))
+            outputs_to_collect[key] = cromwell.CromwellOutputType.array_path(
+                name=f'{wfl_name}.{key}', length=len(value)
+            )
         else:
             outputs_to_collect[key] = cromwell.CromwellOutputType.single_path(f'{wfl_name}.{key}')
 
@@ -172,7 +172,7 @@ def add_gatk_sv_jobs(
     for key, value in input_dict.items():
         if isinstance(value, Path):
             paths_as_strings[f'{wfl_name}.{key}'] = str(value)
-        elif isinstance(value, (list, set)):
+        elif isinstance(value, list | set):
             paths_as_strings[f'{wfl_name}.{key}'] = [str(v) for v in value]
         else:
             paths_as_strings[f'{wfl_name}.{key}'] = value
@@ -205,7 +205,7 @@ def add_gatk_sv_jobs(
     for key, resource in output_dict.items():
         out_path = expected_out_dict[key]
         if isinstance(resource, list):
-            for source, dest in zip(resource, out_path):
+            for source, dest in zip(resource, out_path, strict=False):
                 cmds.append(f'gcloud storage cp "$(cat {source})" "{dest}"')
         else:
             cmds.append(f'gcloud storage cp "$(cat {resource})" "{out_path}"')
@@ -324,14 +324,13 @@ def queue_annotate_sv_jobs(
 
     # images!
     input_dict |= get_images(['sv_pipeline_docker', 'sv_base_mini_docker', 'gatk_docker'])
-    jobs = add_gatk_sv_jobs(
+    return add_gatk_sv_jobs(
         dataset=multicohort.analysis_dataset,
         wfl_name='AnnotateVcf',
         input_dict=input_dict,
         expected_out_dict=outputs,
         labels=labels,
     )
-    return jobs
 
 
 def queue_annotate_strvctvre_job(
