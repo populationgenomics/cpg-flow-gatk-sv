@@ -183,10 +183,10 @@ def add_sg_meta_fields(sg_df: pd.DataFrame, sg_meta: dict[str, dict]) -> pd.Data
     Returns:
         pd.DataFrame: DataFrame with the sg_meta fields parsed and added
     """
-    sg_df['library'] = sg_df['ID'].map(
+    sg_df['library'] = sg_df['sample_id'].map(
         lambda x: sg_meta[x].get('library_type', sg_meta[x].get('sequencing_library', 'unknown')),
     )
-    sg_df['facility'] = sg_df['ID'].map(
+    sg_df['facility'] = sg_df['sample_id'].map(
         lambda x: sg_meta[x].get('facility', sg_meta[x].get('sequencing_facility', 'unknown')),
     )
     return sg_df
