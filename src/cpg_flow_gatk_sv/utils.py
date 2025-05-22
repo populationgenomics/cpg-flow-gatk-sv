@@ -117,9 +117,9 @@ def get_references(keys: list[str | dict[str, str]]) -> dict[str, str | list[str
         # e.g. GATKSVPipelineBatch.rmsk -> rmsk
         ref_d_key = ref_d_key.split('.')[-1]
         try:
-            res[key] = config.reference_path(f'gatk_sv/{ref_d_key}')
+            res[key] = config.reference_path(f'gatk_sv/{ref_d_key}')  # type: ignore[index]
         except (KeyError, config.ConfigError):
-            res[key] = config.reference_path(f'broad/{ref_d_key}')
+            res[key] = config.reference_path(f'broad/{ref_d_key}')  # type: ignore[index]
 
     return res
 
