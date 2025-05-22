@@ -226,7 +226,7 @@ def partition_batches(
 
     # filter to the PCR-state SGs we're interested in
     sample_ids = list(sequencing_groups.keys())  # noqa: F841
-    md = md.query('ID in @sample_ids')
+    md = md.query('sample_id in @sample_ids')
     md = add_sg_meta_fields(md, sequencing_groups)
 
     # check that we have enough samples to batch
