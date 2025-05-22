@@ -43,10 +43,17 @@ def create_sample_batches(
 
     job = hail_batch.get_batch().new_bash_job('Create Sample Batches')
     job.image(config.config_retrieve(['workflow', 'driver_image']))
+
+    # localise each qc table
+    local_tables = [hail_batch.get_batch().read_input(qc_table) for qc_table in qc_tables]
+
     job.command(f"""
         python3 {sample_batching.__file__} \
-            --qc_tables {' '.join(qc_tables)} \
+            --qc_tables {' '.join(local_tables)} \
             --sgs_json {sgs_json_path} \
-            --output_json {output_json}
+            --output_json {job.output}
     """)
+
+    # write the output to the destination
+    hail_batch.get_batch().write_output(job.output, output_json)
     return job

@@ -279,7 +279,6 @@ def make_combined_ped(cohort: targets.Cohort | targets.MultiCohort, prefix: Path
     """
     combined_ped_path = prefix / 'ped_with_ref_panel.ped'
     conf_ped_path = get_references(['ped_file'])['ped_file']
-    assert isinstance(conf_ped_path, str)
     with combined_ped_path.open('w') as out:
         with cohort.write_ped_file().open() as f:
             # layer of family ID cleaning
@@ -358,7 +357,6 @@ def queue_annotate_strvctvre_job(
     strv_job.memory(config.config_retrieve(['resource_overrides', name, 'memory'], '16Gi'))
 
     strvctvre_phylop = get_references(['strvctvre_phylop'])['strvctvre_phylop']
-    assert isinstance(strvctvre_phylop, str)
 
     local_phylop = hail_batch.get_batch().read_input(strvctvre_phylop)
 
