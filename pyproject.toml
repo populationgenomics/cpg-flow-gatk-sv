@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name='cpg_flow_gatk_sv'
-description="CPG-Flow implementation of the CPG's GATK-SV workflow"
+description="CPG-Flow implementation of the GATK-SV workflow"
 readme = "README.md"
 # currently cpg-flow is pinned to this version
 requires-python = ">=3.10,<3.11"
@@ -27,7 +27,7 @@ dependencies=[
 
 [project.urls]
 # TODO(you): update this to reflect the project's official homepage
-Repository = "https://github.com/populationgenomics/workflow_name"
+Repository = "https://github.com/populationgenomics/cpg-flow-gatk-sv"
 
 [project.optional-dependencies]
 # various requirements when running cpg-flow/analysis-runner
@@ -49,7 +49,7 @@ package-dir = {"" = "src"}
 include_package_data = true
 
 [options.package_data]
-'workflow_name'=  ['config_template.toml']
+'cpg_flow_gatk_sv'=  ['config_template.toml']
 
 [tool.black]
 line-length = 120
