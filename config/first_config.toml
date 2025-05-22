@@ -64,8 +64,8 @@ disk_gb = 40
 [resource_overrides.EvidenceQC.runtime_attr_mediancov]
 disk_gb = 200
 
-[hail]
-billing_project = "test-vcgs-dataset"
-delete_scratch_on_exit = true
-dry_run = true
-backend = "local"
+#[hail]
+#billing_project = "test-vcgs-dataset"
+#delete_scratch_on_exit = true
+#dry_run = true
+#backend = "local"
