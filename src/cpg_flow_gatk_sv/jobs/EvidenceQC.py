@@ -13,7 +13,9 @@ if TYPE_CHECKING:
 
 
 def create_evidence_qc_jobs(
-    input_dict: dict[str, Path], output_dict: dict[str, Path], cohort: targets.Cohort
+    input_dict: dict[str, Path],
+    output_dict: dict[str, Path],
+    cohort: targets.Cohort,
 ) -> list['BashJob']:
     """
 
@@ -50,6 +52,6 @@ def create_evidence_qc_jobs(
         wfl_name='EvidenceQC',
         input_dict=cromwell_input_dict,
         expected_out_dict=output_dict,
-        labels={'stage': 'EvidenceQC', AR_GUID_NAME: try_get_ar_guid()},
+        labels={'stage': 'evidenceqc', AR_GUID_NAME: try_get_ar_guid()},
         job_size=utils.CromwellJobSizes.MEDIUM,
     )
