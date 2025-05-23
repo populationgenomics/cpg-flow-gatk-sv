@@ -1,5 +1,7 @@
 # GATK-SV, in CPG-Flow
 
+Current Version: 0.1.0
+
 This repository contains the GATK-SV workflow, which is a wrapper around the [GATK-SV Cromwell workflow](https://github.com/broadinstitute/gatk-sv). It has been migrated from [Production-Pipelines](https://github.com/populationgenomics/production-pipelines/tree/main/cpg_workflows/stages/gatk_sv). This has been generated as part of the migration from Production-Pipelines's CPG_workflows framework, to the separate CPG-Flow.
 
 ## Workflows
