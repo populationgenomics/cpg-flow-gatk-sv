@@ -1,32 +1,79 @@
-# cpg-flow-pipeline-template
-A template repository to use as a base for CPG workflows using the cpg-flow pipeline framework
+# GATK-SV, in CPG-Flow
 
-## Purpose
+Current Version: 0.1.1
 
-When migrating workflows from production-pipelines, this template respository structure can be used to start with a
-sensible directory structure, and some suggested conventions for naming and placement of files.
+This repository contains the GATK-SV workflow, which is a wrapper around the [GATK-SV Cromwell workflow](https://github.com/broadinstitute/gatk-sv). It has been migrated from [Production-Pipelines](https://github.com/populationgenomics/production-pipelines/tree/main/cpg_workflows/stages/gatk_sv). This has been generated as part of the migration from Production-Pipelines's CPG_workflows framework, to the separate CPG-Flow.
+
+## Workflows
+
+This repository contains the following workflows:
+
+- `first_workflow` - previously called `gatk_sv_singlesample`. This is the initial per-sample variant calling, generation of QC metrics following variant calling, through to batching of samples based on those metrics. The exact stages are:
+    1. [GatherSampleEvidence](https://github.com/broadinstitute/gatk-sv/blob/main/wdl/GatherSampleEvidence.wdl)
+    2. [EvidenceQC](https://github.com/broadinstitute/gatk-sv/blob/main/wdl/EvidenceQC.wdl)
+    3. `CreateSampleBatches` - a somewhat bespoke sample batching script
+
+- `second_workflow` - previously called `gatk_sv_multisample`. This is the Cohort based batch processing of clustered samples, through to a final joint-called dataset.
+
+## Structure
+
+Following a best-practices CPG-Flow structure, the repository is structured as follows:
 
 ```commandline
-src
-├── workflow_name
-│   ├── __init__.py
-│   ├── config_template.toml
-│   ├── jobs
-│   │   └── LogicForAStage.py
-│   ├── main.py
-│   ├── stages.py
-│   └── utils.py
+├── Dockerfile
+├── LICENSE
+├── README.md
+├── pull_request_template.md
+├── pyproject.toml
+└── src
+    ├── cpg_flow_gatk_sv
+    │   ├── __init__.py
+    │   ├── config_template.toml
+    │   ├── first_workflow.py
+    │   ├── jobs
+    │   │   ├── CreateSampleBatches.py
+    │   │   ├── EvidenceQC.py
+    │   │   ├── GatherSampleEvidence.py
+    │   │   └── ...
+    │   ├── scripts
+    │   │   ├── __init__.py
+    │   │   └── sample_batching.py
+    │   │   └── ...
+    │   └── utils.py
 ```
 
-`workflow_name` occurs in a number of places ([pyproject.toml](pyproject.toml), [src](src), and the workflow name in the
-template config file). It is intended that you remove this generic placeholder name, and replace it with the name of
-your workflow.
+This structure contains the following important files:
 
-`stages.py` contains Stages in the workflow, with the actual logic imported from files in `jobs`.
+- `pyproject.toml` - the build instructions and linter settings for the repository
+- `first_workflow` - the Stages and workflow trigger for the first workflow
+- `second_workflow` - the Stages and workflow trigger for the second workflow
+- `jobs` - a directory containing the logic for each of the Stages in the workflow. Each file contains a single Stage, and is
+  named after the Stage it contains. This implements all the logic for a stage, including assembling the input dictionary to be passed to Cromwell.
+- `scripts` - a directory containing any scripts which are not part of the GATK-SV Cromwell workflow, but are used in the workflow. This
+  includes any helper scripts, or CPG-custom logic.
 
-`stages.py` also links to the Pipeline Naming Conventions document, containing a number of recommendations for naming
-Stages and other elements of the workflow.
+## Example invocation
 
-`config_template.toml` is a template, indicating the settings which are mandatory for the pipeline to run. In
-production-pipelines, many of these settings were satisfied by the cpg-workflows or per-workflow default TOML files. If
-a pipeline is being migrated from production-pipelines, the previous default config TOML would be a better substitute.
+This is designed to be run using analysis-runner, using a fully containerised installation of this codebase.
+
+```bash
+analysis-runner \
+    --skip-repo-checkout \
+    --image australia-southeast1-docker.pkg.dev/cpg-common/images/cpg-flow-gatk-sv:0.1.1 \
+    --dataset DATASET \
+    --description 'GATK-SV, CPG-flow' \
+    -o gatk-sv_cpg-flow \
+    --access-level full \
+    --config CONFIG \
+    first_workflow
+```
+
+## Development
+
+Semantic Versioning should be implemented with `bump-my-version`
+
+```commandline
+bump-my-version bump patch/minor/major
+```
+
+This is using the configuration block inside `pyproject.toml`
