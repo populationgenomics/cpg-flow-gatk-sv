@@ -270,14 +270,20 @@ def clean_ped_family_ids(ped_line: str) -> str:
     return '\t'.join(split_line) + '\n'
 
 
-def make_combined_ped(cohort: targets.Cohort | targets.MultiCohort, prefix: Path) -> Path:
+def make_combined_ped(cohort: targets.Cohort | targets.MultiCohort, combined_ped_path: Path) -> None:
     """
     Create cohort + ref panel PED.
     Concatenating all samples across all datasets with ref panel
 
     See #578 - there are restrictions on valid characters in PED file
+
+    Args:
+        cohort ():
+        combined_ped_path ():
+
+    Returns:
+        None
     """
-    combined_ped_path = prefix / 'ped_with_ref_panel.ped'
     conf_ped_path = get_references(['ped_file'])['ped_file']
     with combined_ped_path.open('w') as out:
         with cohort.write_ped_file().open() as f:
@@ -287,7 +293,6 @@ def make_combined_ped(cohort: targets.Cohort | targets.MultiCohort, prefix: Path
         # The ref panel PED doesn't have any header, so can safely concatenate:
         with to_path(conf_ped_path).open() as f:
             out.write(f.read())
-    return combined_ped_path
 
 
 def queue_annotate_sv_jobs(
