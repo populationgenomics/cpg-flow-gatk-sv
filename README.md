@@ -67,3 +67,13 @@ analysis-runner \
     --config CONFIG \
     first_workflow
 ```
+
+## Development
+
+Semantic Versioning should be implemented with `bump-my-version`
+
+```commandline
+bump-my-version bump patch/minor/major
+```
+
+This is using the configuration block inside `pyproject.toml`
