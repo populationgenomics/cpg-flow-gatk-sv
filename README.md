@@ -52,7 +52,7 @@ This structure contains the following important files:
 - `scripts` - a directory containing any scripts which are not part of the GATK-SV Cromwell workflow, but are used in the workflow. This
   includes any helper scripts, or CPG-custom logic.
 
-## Example invocation 
+## Example invocation
 
 This is designed to be run using analysis-runner, using a fully containerised installation of this codebase.
 
