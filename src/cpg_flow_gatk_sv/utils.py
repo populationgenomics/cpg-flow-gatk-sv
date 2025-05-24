@@ -240,35 +240,37 @@ def get_ref_panel(keys: list[str] | None = None) -> dict:
     }
 
 
-def clean_ped_family_ids(ped_line: str) -> str:
+def clean_ped_family_id(family_id: str) -> str:
     """
-    Takes each line in the pedigree and cleans it up
+    Takes a family ID from the pedigree and cleans it up
     If the family ID already conforms to expectations, no action
-    If the family ID fails, replace all non-alphanumeric/non-underscore
-    characters with underscores
+    If the family ID fails, replace all non-alphanumeric/non-underscore characters with underscores
 
-    >>> clean_ped_family_ids('family1\tchild1\t0\t0\t1\t0\\n')
-    'family1\tchild1\t0\t0\t1\t0\\n'
-    >>> clean_ped_family_ids('family-1-dirty\tchild1\t0\t0\t1\t0\\n')
-    'family_1_dirty\tchild1\t0\t0\t1\t0\\n'
+    >>> clean_ped_family_id('family1')
+    'family1'
+    >>> clean_ped_family_id('family-1-dirty')
+    'family_1_dirty'
 
     Args:
-        ped_line (str): line from the pedigree file, unsplit
+        family_id (str): line from the pedigree file, unsplit
 
     Returns:
         the same line with a transformed family id
     """
 
-    split_line = ped_line.rstrip().split('\t')
-
-    if re.match(PED_FAMILY_ID_REGEX, split_line[0]):
-        return ped_line
-
     # if the family id is not valid, replace failing characters with underscores
-    split_line[0] = re.sub(r'[^A-Za-z0-9_]', '_', split_line[0])
-
-    # return the rebuilt string, with a newline at the end
-    return '\t'.join(split_line) + '\n'
+    return (
+        family_id
+        if re.match(
+            PED_FAMILY_ID_REGEX,
+            family_id,
+        )
+        else re.sub(
+            r'[^A-Za-z0-9_]',
+            '_',
+            family_id,
+        )
+    )
 
 
 def make_combined_ped(cohort: targets.Cohort | targets.MultiCohort, combined_ped_path: Path) -> None:
@@ -285,15 +287,36 @@ def make_combined_ped(cohort: targets.Cohort | targets.MultiCohort, combined_ped
     Returns:
         None
     """
+
+    # first get standard pedigree
+    ped_dicts = [sequencing_group.pedigree.get_ped_dict() for sequencing_group in cohort.get_sequencing_groups()]
+
+    if not ped_dicts:
+        raise ValueError(f'No pedigree data found for {cohort.id}')
+
     conf_ped_path = get_references(['ped_file'])['ped_file']
-    with combined_ped_path.open('w') as out:
-        with cohort.write_ped_file().open() as f:
-            # layer of family ID cleaning
-            for line in f:
-                out.write(clean_ped_family_ids(line))
+
+    with (
+        combined_ped_path.open('w') as out,
+        to_path(conf_ped_path).open() as ref_ped,
+    ):
+        # layer of family ID cleaning
+        for ped_dict in ped_dicts:
+            out.write(
+                '\t'.join(
+                    [
+                        clean_ped_family_id(ped_dict['Family.ID']),
+                        ped_dict['Individual.ID'],
+                        ped_dict['Father.ID'],
+                        ped_dict['Mother.ID'],
+                        ped_dict['Sex'],
+                        ped_dict['Phenotype'],
+                    ]
+                )
+            )
+
         # The ref panel PED doesn't have any header, so can safely concatenate:
-        with to_path(conf_ped_path).open() as f:
-            out.write(f.read())
+        out.write(ref_ped.read())
 
 
 def queue_annotate_sv_jobs(
