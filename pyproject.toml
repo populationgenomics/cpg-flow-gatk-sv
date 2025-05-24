@@ -38,8 +38,9 @@ test = [
 
 [project.scripts]
 
-# the workflow runner script - entrypoint for the pipeline
+# the workflow runner scripts - entrypoints for the different pipelines
 first_workflow = 'cpg_flow_gatk_sv.first_workflow:cli_main'
+second_workflow = 'cpg_flow_gatk_sv.second_workflow:cli_main'
 
 [tool.setuptools]
 package-dir = {"" = "src"}
