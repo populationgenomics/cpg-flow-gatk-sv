@@ -2,8 +2,10 @@
 All post-batching stages of the GATK-SV workflow
 """
 
+import argparse
+
 from cpg_utils import Path
-from cpg_flow import stage, targets
+from cpg_flow import stage, targets, workflow
 from cpg_flow_gatk_sv.utils import check_for_cohort_overlaps, make_combined_ped
 from cpg_flow_gatk_sv.jobs import TrainGCNV
 
@@ -62,3 +64,21 @@ class TrainGcnvStage(stage.CohortStage):
         jobs = TrainGCNV.add_train_gcnv_jobs(cohort, output_dict=outputs)
 
         return self.make_outputs(cohort, data=outputs, jobs=jobs)
+
+
+def cli_main():
+    """
+    CLI entrypoint - starts up the workflow
+    """
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--dry_run', action='store_true', help='Dry run')
+    args = parser.parse_args()
+
+    workflow.run_workflow(
+        stages=[TrainGcnvStage, MakeCohortCombinedPed, MakeMultiCohortCombinedPed],
+        dry_run=args.dry_run,
+    )
+
+
+if __name__ == '__main__':
+    cli_main()
