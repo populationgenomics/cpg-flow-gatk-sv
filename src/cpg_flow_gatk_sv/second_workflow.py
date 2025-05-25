@@ -54,7 +54,7 @@ class TrainGcnvStage(stage.CohortStage):
             'cohort_contig_ploidy_calls_tar': self.get_stage_cohort_prefix(cohort)
             / 'cohort_contig_ploidy_calls.tar.gz',
             'cohort_gcnv_model_tars': [
-                self.get_stage_cohort_prefix(cohort) / 'cohort_gcnv_model.tar.gz'
+                self.get_stage_cohort_prefix(cohort) / f'cohort_gcnv_model_{idx}.tar.gz' for idx in range(290)
             ],  # I have absolutely no idea how long this will be
         }
 
