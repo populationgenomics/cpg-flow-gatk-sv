@@ -9,6 +9,8 @@ import loguru
 from cpg_flow import stage, targets, workflow
 from cpg_flow_gatk_sv import utils
 from cpg_flow_gatk_sv.jobs import (
+    AnnotateVcf,
+    AnnotateWithStrvctvre,
     ClusterBatch,
     FilterBatch,
     GatherBatchEvidence,
@@ -24,6 +26,7 @@ from cpg_flow_gatk_sv.jobs import (
     GeneratePloidyTable,
     FilterGenotypes,
     FilterWham,
+    SpiceUpSvIds,
 )
 from cpg_utils import Path, config
 
@@ -687,136 +690,137 @@ class FilterWhamStage(stage.MultiCohortStage):
         return self.make_outputs(multicohort, data=output, jobs=job)
 
 
-# @stage(required_stages=[FilterWham], analysis_type='sv', analysis_keys=['annotated_vcf'])
-# class AnnotateVcf(MultiCohortStage):
-#     """
-#     Add annotations, such as the inferred function and allele frequencies of variants,
-#     to final VCF.
-#
-#     Annotations methods include:
-#     * Functional annotation - annotate SVs with inferred functional consequence on
-#       protein-coding regions, regulatory regions such as UTR and promoters, and other
-#       non-coding elements.
-#     * Allele frequency annotation - annotate SVs with their allele frequencies across
-#       all samples, and samples of specific sex, as well as specific subpopulations.
-#     * Allele Frequency annotation with external callset - annotate SVs with the allele
-#       frequencies of their overlapping SVs in another callset, e.g. gnomad SV callset.
-#
-#     Note: the annotation stage is stupid, and re-orders the VCF by ID instead of position
-#     This means that we run SVConcordance before this stage, to ensure that the IDs are correct
-#     But we don't apply those IDs, in case multiple variants map to the same ID, which would
-#     cause the variants to become unsorted when ordered by ID.
-#     """
-#
-#     def expected_outputs(self, multicohort: MultiCohort) -> dict:
-#         return {
-#             'annotated_vcf': self.prefix / 'filtered_annotated.vcf.bgz',
-#             'annotated_vcf_index': self.prefix / 'filtered_annotated.vcf.bgz.tbi',
-#         }
-#
-#     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
-#         """
-#         Configure and queue jobs for SV annotation. Passing the VCF Index has become implicit
-#         """
-#         input_vcf = inputs.as_dict(multicohort, FilterWham)['wham_filtered_vcf']
-#         expected_out = self.expected_outputs(multicohort)
-#         billing_labels = {'stage': self.name.lower(), AR_GUID_NAME: try_get_ar_guid()}
-#         job_or_none = queue_annotate_sv_jobs(multicohort, self.prefix, input_vcf, expected_out, billing_labels)
-#         return self.make_outputs(multicohort, data=expected_out, jobs=job_or_none)
-#
-#
-# @stage(required_stages=AnnotateVcf)
-# class AnnotateVcfWithStrvctvre(MultiCohortStage):
-#     def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
-#         return {
-#             'strvctvre_vcf': self.prefix / 'strvctvre_annotated.vcf.gz',
-#             'strvctvre_vcf_index': self.prefix / 'strvctvre_annotated.vcf.gz.tbi',
-#         }
-#
-#     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
-#
-#         input_dict = inputs.as_dict(multicohort, AnnotateVcf)
-#         expected_d = self.expected_outputs(multicohort)
-#
-#         # read vcf and index into the batch
-#         input_vcf = get_batch().read_input_group(
-#             vcf=str(input_dict['annotated_vcf']),
-#             vcf_index=str(input_dict['annotated_vcf_index']),
-#         )['vcf']
-#
-#         strvctvre_job = queue_annotate_strvctvre_job(input_vcf, str(expected_d['strvctvre_vcf']), self.get_job_attrs())
-#
-#         return self.make_outputs(multicohort, data=expected_d, jobs=strvctvre_job)
-#
-#
-# @stage(required_stages=AnnotateVcfWithStrvctvre, analysis_type='sv')
-# class SpiceUpSVIDs(MultiCohortStage):
-#     """
-#     Overwrites the GATK-SV assigned IDs with a meaningful ID
-#     This new ID is either taken from an equivalent variant ID in the previous callset (found through SVConcordance)
-#     or a new one is generated based on the call attributes itself
-#     A boolean flag is used to switch behaviour, based on the truthiness of the return value of query_for_spicy_vcf
-#     If a VCF is returned, True, which also means a VCF should have been used in UpdateStructuralVariantIDs
-#     If the return is None, False, and the IDs will be generated from the call attributes alone
-#     """
-#
-#     def expected_outputs(self, multicohort: MultiCohort) -> Path:
-#         return self.prefix / 'fresh_ids.vcf.bgz'
-#
-#     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
-#         input_vcf = get_batch().read_input(str(inputs.as_path(multicohort, AnnotateVcfWithStrvctvre, 'strvctvre_vcf')))
-#         expected_output = self.expected_outputs(multicohort)
-#
-#         # update the IDs using a PythonJob
-#         pyjob = get_batch().new_python_job('rename_sv_ids')
-#         pyjob.storage('10Gi')
-#         skip_prior_names = bool(query_for_spicy_vcf(multicohort.analysis_dataset.name))
-#         pyjob.call(rename_sv_ids, input_vcf, pyjob.output, skip_prior_names)
-#
-#         # then compress & run tabix on that plain text result
-#         bcftools_job = get_batch().new_job('bgzip and tabix')
-#         bcftools_job.image(image_path('bcftools'))
-#         bcftools_job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
-#         bcftools_job.command(f'bcftools view {pyjob.output} | bgzip -c > {bcftools_job.output["vcf.bgz"]}')
-#         bcftools_job.command(f'tabix {bcftools_job.output["vcf.bgz"]}')  # type: ignore
-#
-#         # get the output root to write to
-#         get_batch().write_output(bcftools_job.output, str(expected_output).removesuffix('.vcf.bgz'))
-#
-#         return self.make_outputs(multicohort, data=expected_output, jobs=[pyjob, bcftools_job])
-#
-#
-# @stage(required_stages=SpiceUpSVIDs)
-# class AnnotateCohortSv(MultiCohortStage):
-#     """
-#     First step to transform annotated SV callset data into a seqr ready format
-#     """
-#
-#     def expected_outputs(self, multicohort: MultiCohort) -> dict:
-#         """
-#         Expected to write a matrix table.
-#         """
-#         return {'tmp_prefix': str(self.tmp_prefix), 'mt': self.prefix / 'cohort_sv.mt'}
-#
-#     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
-#         """
-#         queue job(s) to rearrange the annotations prior to Seqr transformation
-#         """
-#         outputs = self.expected_outputs(multicohort)
-#
-#         vcf_path = inputs.as_path(target=multicohort, stage=SpiceUpSVIDs)
-#         checkpoint_prefix = to_path(outputs['tmp_prefix']) / 'checkpoints'
-#
-#         job = annotate_cohort_jobs_sv(
-#             vcf_path=vcf_path,
-#             out_mt_path=outputs['mt'],
-#             checkpoint_prefix=checkpoint_prefix,
-#             job_attrs=self.get_job_attrs(multicohort),
-#         )
-#
-#         return self.make_outputs(multicohort, data=outputs, jobs=job)
-#
-#
+@stage.stage(
+    required_stages=[FilterWhamStage, MakeMultiCohortCombinedPed],
+    analysis_type='sv',
+    analysis_keys=['annotated_vcf'],
+)
+class AnnotateVcfStage(stage.MultiCohortStage):
+    """
+    Add annotations, such as the inferred function and allele frequencies of variants,
+    to final VCF.
+
+    Annotations methods include:
+    * Functional annotation - annotate SVs with inferred functional consequence on
+      protein-coding regions, regulatory regions such as UTR and promoters, and other
+      non-coding elements.
+    * Allele frequency annotation - annotate SVs with their allele frequencies across
+      all samples, and samples of specific sex, as well as specific subpopulations.
+    * Allele Frequency annotation with external callset - annotate SVs with the allele
+      frequencies of their overlapping SVs in another callset, e.g. gnomad SV callset.
+
+    Note: the annotation stage is stupid, and re-orders the VCF by ID instead of position
+    This means that we run SVConcordance before this stage, to ensure that the IDs are correct
+    But we don't apply those IDs, in case multiple variants map to the same ID, which would
+    cause the variants to become unsorted when ordered by ID.
+    """
+
+    def expected_outputs(self, multicohort: targets.MultiCohort) -> dict[str, Path]:
+        return {
+            'annotated_vcf': self.prefix / 'filtered_annotated.vcf.bgz',
+            'annotated_vcf_index': self.prefix / 'filtered_annotated.vcf.bgz.tbi',
+        }
+
+    def queue_jobs(self, multicohort: targets.MultiCohort, inputs: stage.StageInput) -> stage.StageOutput:
+        """
+        Configure and queue jobs for SV annotation. Passing the VCF Index has become implicit
+        """
+        outputs = self.expected_outputs(multicohort)
+
+        input_vcf = inputs.as_str(multicohort, FilterWhamStage, 'wham_filtered_vcf')
+        pedigree = inputs.as_str(target=multicohort, stage=MakeMultiCohortCombinedPed)
+
+        jobs = AnnotateVcf.create_svannotate_jobs(
+            multicohort=multicohort,
+            input_vcf=input_vcf,
+            pedigree=pedigree,
+            outputs=outputs,
+        )
+
+        return self.make_outputs(multicohort, data=outputs, jobs=jobs)
+
+
+@stage.stage(required_stages=AnnotateVcfStage)
+class AnnotateVcfWithStrvctvreStage(stage.MultiCohortStage):
+    def expected_outputs(self, multicohort: targets.MultiCohort) -> dict[str, Path]:
+        return {
+            'strvctvre_vcf': self.prefix / 'strvctvre_annotated.vcf.gz',
+            'strvctvre_vcf_index': self.prefix / 'strvctvre_annotated.vcf.gz.tbi',
+        }
+
+    def queue_jobs(self, multicohort: targets.MultiCohort, inputs: stage.StageInput) -> stage.StageOutput:
+        input_vcf = inputs.as_str(multicohort, AnnotateVcfStage, 'annotated_vcf')
+        outputs = self.expected_outputs(multicohort)
+
+        job = AnnotateWithStrvctvre.create_strvctvre_jobs(
+            input_vcf=input_vcf,
+            output=str(outputs['strvctvre_vcf']),
+            name=self.name,
+        )
+        return self.make_outputs(multicohort, data=outputs, jobs=job)
+
+
+@stage.stage(required_stages=AnnotateVcfWithStrvctvreStage, analysis_type='sv')
+class SpiceUpSvIdsStage(stage.MultiCohortStage):
+    """
+    Overwrites the GATK-SV assigned IDs with a meaningful ID
+    This new ID is either taken from an equivalent variant ID in the previous callset (found through SVConcordance)
+    or a new one is generated based on the call attributes itself
+    A boolean flag is used to switch behaviour, based on the truthiness of the return value of query_for_spicy_vcf
+    If a VCF is returned, True, which also means a VCF should have been used in UpdateStructuralVariantIDs
+    If the return is None, False, and the IDs will be generated from the call attributes alone
+    """
+
+    def expected_outputs(self, multicohort: targets.MultiCohort) -> Path:
+        return self.prefix / 'fresh_ids.vcf.bgz'
+
+    def queue_jobs(self, multicohort: targets.MultiCohort, inputs: stage.StageInput) -> stage.StageOutput:
+        output = self.expected_outputs(multicohort)
+        input_vcf = inputs.as_str(multicohort, AnnotateVcfWithStrvctvreStage, 'strvctvre_vcf')
+
+        jobs = SpiceUpSvIds.create_spicy_jobs(
+            input_vcf=input_vcf,
+            skip_prior_names=bool(utils.query_for_spicy_vcf(multicohort.analysis_dataset.name)),
+            output=str(output),
+        )
+
+        return self.make_outputs(multicohort, data=output, jobs=jobs)
+
+
+@stage.stage(required_stages=SpiceUpSvIdsStage)
+class AnnotateCohortSv(stage.MultiCohortStage):
+    """
+    First step to transform annotated SV callset data into a seqr ready format
+    """
+
+    def expected_outputs(self, multicohort: targets.MultiCohort) -> dict:
+        """
+        Expected to write a matrix table.
+        """
+        return {
+            'tmp_prefix': str(self.tmp_prefix),
+            'mt': self.prefix / 'cohort_sv.mt',
+        }
+
+    def queue_jobs(self, multicohort: targets.MultiCohort, inputs: stage.StageInput) -> stage.StageOutput:
+        """
+        queue job(s) to rearrange the annotations prior to Seqr transformation
+        """
+        outputs = self.expected_outputs(multicohort)
+
+        vcf_path = inputs.as_path(target=multicohort, stage=SpiceUpSvIdsStage)
+        checkpoint_prefix = to_path(outputs['tmp_prefix']) / 'checkpoints'
+
+        job = annotate_cohort_jobs_sv(
+            vcf_path=vcf_path,
+            out_mt_path=outputs['mt'],
+            checkpoint_prefix=checkpoint_prefix,
+            job_attrs=self.get_job_attrs(multicohort),
+        )
+
+        return self.make_outputs(multicohort, data=outputs, jobs=job)
+
+
 # @stage(required_stages=[CombineExclusionLists, AnnotateCohortSv], analysis_type='sv', analysis_keys=['mt'])
 # class AnnotateDatasetSv(DatasetStage):
 #     """
@@ -996,6 +1000,8 @@ def cli_main():
             JoinRawCallsStage,
             GeneratePloidyTableStage,
             FilterGenotypes,
+            AnnotateVcfStage,
+            AnnotateVcfWithStrvctvreStage,
         ],
         dry_run=args.dry_run,
     )

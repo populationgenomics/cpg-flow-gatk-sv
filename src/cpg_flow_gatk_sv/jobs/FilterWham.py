@@ -17,12 +17,16 @@ def create_filter_wham_jobs(
     job.image(config.config_retrieve(['images', 'bcftools']))
     job.cpu(1).memory('highmem').storage('20Gi')
 
-    job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
+    job.declare_resource_group(
+        output={
+            'vcf.bgz': '{root}.vcf.bgz',
+            'vcf.bgz.tbi': '{root}.vcf.bgz.tbi',
+        }
+    )
     job.command(
         'bcftools view -e \'SVTYPE=="DEL" && COUNT(ALGORITHMS)==1 && ALGORITHMS=="wham"\' '
-        f'{in_vcf} | bgzip -c  > {job.output["vcf.bgz"]}',
+        f'-Oz -o {job.output["vcf.bgz"]} -W=tbi {in_vcf}',
     )
-    job.command(f'tabix {job.output["vcf.bgz"]}')
     hail_batch.get_batch().write_output(
         job.output,
         output.replace('.vcf.bgz', ''),
