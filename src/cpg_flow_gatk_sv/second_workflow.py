@@ -16,6 +16,7 @@ from cpg_flow_gatk_sv.jobs import (
     CombineExclusionLists,
     GenotypeBatch,
     MakeCohortVcf,
+    FormatVcfForGatk,
 )
 from cpg_utils import Path, config
 
@@ -460,6 +461,155 @@ class MakeCohortVcfStage(stage.MultiCohortStage):
         )
 
         return self.make_outputs(multicohort, data=outputs, jobs=jobs)
+
+
+@stage.stage(required_stages=[MakeMultiCohortCombinedPed, MakeCohortVcfStage])
+class FormatVcfForGatkStage(stage.MultiCohortStage):
+    def expected_outputs(self, multicohort: targets.MultiCohort) -> dict:
+        return {
+            'gatk_formatted_vcf': self.prefix / 'gatk_formatted.vcf.gz',
+            'gatk_formatted_vcf_index': self.prefix / 'gatk_formatted.vcf.gz.tbi',
+        }
+
+    def queue_jobs(self, multicohort: targets.MultiCohort, inputs: stage.StageInput) -> stage.StageOutput:
+        pedigree_input = inputs.as_str(target=multicohort, stage=MakeMultiCohortCombinedPed)
+        vcf_input = inputs.as_str(multicohort, MakeCohortVcfStage, 'vcf')
+        outputs = self.expected_outputs(multicohort)
+
+        jobs = FormatVcfForGatk.create_formatvcf_jobs(
+            multicohort,
+            pedigree_input,
+            vcf_input,
+            outputs,
+        )
+
+        return self.make_outputs(multicohort, data=outputs, jobs=jobs)
+
+
+# @stage(required_stages=[MakeMultiCohortCombinedPed, ClusterBatch, MakeCohortVcf])
+# class JoinRawCalls(MultiCohortStage):
+#     """
+#     Joins all individually clustered caller results
+#     """
+#
+#     def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
+#         return {
+#             'joined_raw_calls_vcf': self.prefix / 'raw_clustered_calls.vcf.gz',
+#             'joined_raw_calls_vcf_index': self.prefix / 'raw_clustered_calls.vcf.gz.tbi',
+#         }
+#
+#     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
+#         pedigree_input = inputs.as_path(target=multicohort, stage=MakeMultiCohortCombinedPed, key='multicohort_ped')
+#         input_dict: dict[str, Any] = {
+#             'FormatVcfForGatk.formatter_args': '--fix-end',
+#             'prefix': multicohort.name,
+#             'ped_file': str(pedigree_input),
+#             'reference_fasta': get_fasta(),
+#             'reference_fasta_fai': str(get_fasta()) + '.fai',
+#             'reference_dict': str(get_fasta().with_suffix('.dict')),
+#         }
+#         input_dict |= get_images(['gatk_docker', 'sv_pipeline_docker', 'sv_base_mini_docker'])
+#         input_dict |= get_references([{'contig_list': 'primary_contigs_list'}])
+#
+#         # add all clustered _caller_ files, plus indices
+#         clusterbatch_outputs = inputs.as_dict_by_target(ClusterBatch)
+#
+#         # get the names of all contained cohorts
+#         all_batch_names: list[str] = [cohort.id for cohort in multicohort.get_cohorts()]
+#         for caller in SV_CALLERS + ['depth']:
+#             input_dict[f'clustered_{caller}_vcfs'] = [
+#                 clusterbatch_outputs[cohort][f'clustered_{caller}_vcf'] for cohort in all_batch_names
+#             ]
+#             input_dict[f'clustered_{caller}_vcf_indexes'] = [
+#                 clusterbatch_outputs[cohort][f'clustered_{caller}_vcf_index'] for cohort in all_batch_names
+#             ]
+#
+#         expected_d = self.expected_outputs(multicohort)
+#
+#         jobs = add_gatk_sv_jobs(
+#             dataset=multicohort.analysis_dataset,
+#             wfl_name=self.name,
+#             input_dict=input_dict,
+#             expected_out_dict=expected_d,
+#             labels={'stage': self.name.lower(), AR_GUID_NAME: try_get_ar_guid()},
+#         )
+#         return self.make_outputs(multicohort, data=expected_d, jobs=jobs)
+#
+#
+# @stage(required_stages=[JoinRawCalls, FormatVcfForGatk])
+# class SVConcordance(MultiCohortStage):
+#     """
+#     Takes the clean VCF and reformat for GATK intake
+#     """
+#
+#     def expected_outputs(self, multicohort: MultiCohort) -> dict:
+#         """
+#         create dictionary of names -> output paths
+#         """
+#
+#         return {
+#             'concordance_vcf': self.prefix / 'sv_concordance.vcf.gz',
+#             'concordance_vcf_index': self.prefix / 'sv_concordance.vcf.gz.tbi',
+#         }
+#
+#     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
+#         """
+#         configure and queue jobs for SV concordance
+#         """
+#
+#         input_dict: dict[str, Any] = {
+#             'output_prefix': multicohort.name,
+#             'reference_dict': str(get_fasta().with_suffix('.dict')),
+#             'eval_vcf': inputs.as_dict(multicohort, FormatVcfForGatk)['gatk_formatted_vcf'],
+#             'truth_vcf': inputs.as_dict(multicohort, JoinRawCalls)['joined_raw_calls_vcf'],
+#         }
+#         input_dict |= get_images(['gatk_docker', 'sv_base_mini_docker'])
+#         input_dict |= get_references([{'contig_list': 'primary_contigs_list'}])
+#
+#         expected_d = self.expected_outputs(multicohort)
+#
+#         jobs = add_gatk_sv_jobs(
+#             dataset=multicohort.analysis_dataset,
+#             wfl_name=self.name,
+#             input_dict=input_dict,
+#             expected_out_dict=expected_d,
+#             labels={'stage': self.name.lower(), AR_GUID_NAME: try_get_ar_guid()},
+#         )
+#         return self.make_outputs(multicohort, data=expected_d, jobs=jobs)
+#
+#
+# @stage(required_stages=[MakeMultiCohortCombinedPed, SVConcordance])
+# class GeneratePloidyTable(MultiCohortStage):
+#     """
+#     Quick PythonJob to generate a ploidy table
+#     Calls a homebrewed version of this table generator:
+#     github.com/broadinstitute/gatk-sv/blob/main/src/sv-pipeline/scripts/ploidy_table_from_ped.py
+#     """
+#
+#     def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
+#         """
+#         only one output, the ploidy table
+#         """
+#
+#         return {'ploidy_table': self.prefix / 'ploidy_table.txt'}
+#
+#     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
+#         pedigree_input = inputs.as_path(target=multicohort, stage=MakeMultiCohortCombinedPed, key='multicohort_ped')
+#
+#         py_job = get_batch().new_python_job('create_ploidy_table')
+#         py_job.image(config_retrieve(['workflow', 'driver_image']))
+#
+#         contig_path = get_references(['primary_contigs_list'])['primary_contigs_list']
+#
+#         expected_d = self.expected_outputs(multicohort)
+#         py_job.call(
+#             ploidy_table_from_ped.generate_ploidy_table,
+#             str(pedigree_input),
+#             contig_path,
+#             str(expected_d['ploidy_table']),
+#         )
+#
+#         return self.make_outputs(multicohort, data=expected_d, jobs=py_job)
 
 
 def cli_main():
