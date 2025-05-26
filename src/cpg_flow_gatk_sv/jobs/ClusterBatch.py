@@ -41,7 +41,7 @@ def create_cluster_batch_jobs(
         'pesr_clustering_algorithm': 'SINGLE_LINKAGE',
         'reference_fasta': fasta_file,
         'reference_fasta_fai': f'{fasta_file}.fai',
-        'reference_dict': to_path(fasta_file).with_suffix('.dict'),
+        'reference_dict': str(to_path(fasta_file).with_suffix('.dict')),
     }
 
     for caller in utils.SV_CALLERS:

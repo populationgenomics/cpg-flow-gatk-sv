@@ -6,7 +6,7 @@ import argparse
 
 from cpg_flow import stage, targets, workflow
 from cpg_flow_gatk_sv import utils
-from cpg_flow_gatk_sv.jobs import ClusterBatch, GatherBatchEvidence, TrainGCNV
+from cpg_flow_gatk_sv.jobs import ClusterBatch, FilterBatch, GatherBatchEvidence, GenerateBatchMetrics, TrainGCNV
 from cpg_utils import Path, config
 
 
@@ -178,6 +178,101 @@ class ClusterBatchStage(stage.CohortStage):
         return self.make_outputs(cohort, data=outputs, jobs=jobs)
 
 
+@stage.stage(required_stages=[MakeCohortCombinedPed, ClusterBatchStage, GatherBatchEvidenceStage])
+class GenerateBatchMetricsStage(stage.CohortStage):
+    """
+    Generates variant metrics for filtering.
+    """
+
+    def expected_outputs(self, cohort: targets.Cohort) -> dict[str, Path]:
+        """
+        Metrics files
+        """
+
+        return {
+            'metrics': self.get_stage_cohort_prefix(cohort) / 'metrics.tsv',
+            'metrics_common': self.get_stage_cohort_prefix(cohort) / 'metrics_common.tsv',
+        }
+
+    def queue_jobs(self, cohort: targets.Cohort, inputs: stage.StageInput) -> stage.StageOutput:
+        clusterbatch_outputs = inputs.as_dict(cohort, ClusterBatchStage)
+        gatherbatchevidence_outputs = inputs.as_dict(cohort, GatherBatchEvidenceStage)
+        pedigree_input = inputs.as_str(target=cohort, stage=MakeCohortCombinedPed)
+
+        outputs = self.expected_outputs(cohort)
+
+        jobs = GenerateBatchMetrics.create_generate_batch_metrics_jobs(
+            pedigree_input=pedigree_input,
+            cohort=cohort,
+            gather_batch_evidence_outputs=gatherbatchevidence_outputs,
+            cluster_batch_outputs=clusterbatch_outputs,
+            outputs=outputs,
+        )
+
+        return self.make_outputs(cohort, data=outputs, jobs=jobs)
+
+
+@stage.stage(required_stages=[MakeCohortCombinedPed, GenerateBatchMetrics, ClusterBatch])
+class FilterBatchStage(stage.CohortStage):
+    """
+    Filters poor quality variants and filters outlier samples.
+    """
+
+    def expected_outputs(self, cohort: targets.Cohort) -> dict:
+        """
+        * Filtered SV (non-depth-only a.k.a. "PESR") VCF with outlier samples excluded
+        * Filtered depth-only call VCF with outlier samples excluded
+        * Random forest cutoffs file
+        * PED file with outlier samples excluded
+        """
+
+        ending_by_key: dict = {
+            'filtered_pesr_vcf': 'filtered_pesr_merged.vcf.gz',
+            'cutoffs': 'cutoffs',
+            'scores': 'updated_scores',
+            'RF_intermediate_files': 'RF_intermediate_files.tar.gz',
+            'outlier_samples_excluded_file': 'outliers.samples.list',
+            'batch_samples_postOutlierExclusion_file': 'outliers_excluded.samples.list',
+        }
+
+        for caller in [*utils.SV_CALLERS, 'depth']:
+            ending_by_key[f'filtered_{caller}_vcf'] = f'filtered-{caller}.vcf.gz'
+
+            # unsure why, scramble doesn't export this file
+            if caller != 'scramble':
+                ending_by_key[f'sites_filtered_{caller}_vcf'] = f'sites-filtered-{caller}.vcf.gz'
+
+        ending_by_key['sv_counts'] = [f'{caller}.with_evidence.svcounts.txt' for caller in [*utils.SV_CALLERS, 'depth']]
+        ending_by_key['sv_count_plots'] = [
+            f'{caller}.with_evidence.all_SVTYPEs.counts_per_sample.png' for caller in [*utils.SV_CALLERS, 'depth']
+        ]
+
+        d = {}
+        for key, ending in ending_by_key.items():
+            if isinstance(ending, str):
+                d[key] = self.get_stage_cohort_prefix(cohort) / ending
+            elif isinstance(ending, list):
+                d[key] = [self.get_stage_cohort_prefix(cohort) / e for e in ending]
+        return d
+
+    def queue_jobs(self, cohort: targets.Cohort, inputs: stage.StageInput) -> stage.StageOutput:
+        metrics_d = inputs.as_dict(cohort, GenerateBatchMetricsStage)
+        clusterbatch_d = inputs.as_dict(cohort, ClusterBatchStage)
+        pedigree_input = inputs.as_str(target=cohort, stage=MakeCohortCombinedPed)
+
+        outputs = self.expected_outputs(cohort)
+
+        jobs = FilterBatch.create_filterbatch_jobs(
+            pedigree_input=pedigree_input,
+            cohort=cohort,
+            batch_metrics_outputs=metrics_d,
+            cluster_batch_outputs=clusterbatch_d,
+            outputs=outputs,
+        )
+
+        return self.make_outputs(cohort, data=outputs, jobs=jobs)
+
+
 def cli_main():
     """
     CLI entrypoint - starts up the workflow
@@ -193,6 +288,8 @@ def cli_main():
             MakeMultiCohortCombinedPed,
             GatherBatchEvidenceStage,
             ClusterBatch,
+            GenerateBatchMetricsStage,
+            FilterBatchStage,
         ],
         dry_run=args.dry_run,
     )
