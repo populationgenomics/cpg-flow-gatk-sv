@@ -14,6 +14,8 @@ from cpg_flow_gatk_sv.jobs import (
     TrainGCNV,
     MergeBatchSites,
     CombineExclusionLists,
+    GenotypeBatch,
+    MakeCohortVcf,
 )
 from cpg_utils import Path, config
 
@@ -351,6 +353,115 @@ class CombineExclusionListsStage(stage.MultiCohortStage):
         return self.make_outputs(multicohort, data=output, jobs=job)
 
 
+@stage.stage(
+    required_stages=[FilterBatchStage, GatherBatchEvidenceStage, MergeBatchSitesStage],
+    analysis_type='sv',
+    analysis_keys=['genotyped_depth_vcf', 'genotyped_pesr_vcf'],
+)
+class GenotypeBatchStage(stage.CohortStage):
+    """
+    The final Cohort Stage - executed for each individual Batch
+    Genotypes a batch of samples across filtered variants combined across all batches.
+    Include the additional config file:
+    - configs/gatk_sv/use_for_all_workflows.toml; contains all required images and references
+    The final CohortStage in this workflow
+    """
+
+    def expected_outputs(self, cohort: targets.Cohort) -> dict[str, Path]:
+        """
+        Filtered SV (non-depth-only a.k.a. "PESR") VCF with outlier samples excluded
+        Filtered depth-only call VCF with outlier samples excluded
+        PED file with outlier samples excluded
+        List of SR pass variants
+        List of SR fail variants
+        """
+
+        ending_by_key = {
+            'sr_bothside_pass': 'genotype_SR_part2_bothside_pass.txt',
+            'sr_background_fail': 'genotype_SR_part2_background_fail.txt',
+            'trained_PE_metrics': 'pe_metric_file.txt',
+            'trained_SR_metrics': 'sr_metric_file.txt',
+            'regeno_coverage_medians': 'regeno.coverage_medians_merged.bed',
+        }
+
+        for mode in ['pesr', 'depth']:
+            ending_by_key |= {
+                f'trained_genotype_{mode}_pesr_sepcutoff': f'{mode}.pesr_sepcutoff.txt',
+                f'trained_genotype_{mode}_depth_sepcutoff': f'{mode}.depth_sepcutoff.txt',
+                f'genotyped_{mode}_vcf': f'{mode}.vcf.gz',
+                f'genotyped_{mode}_vcf_index': f'{mode}.vcf.gz.tbi',
+            }
+
+        output_hash = workflow.get_workflow().output_version
+
+        return {key: self.get_stage_cohort_prefix(cohort) / output_hash / fname for key, fname in ending_by_key.items()}
+
+    def queue_jobs(self, cohort: targets.Cohort, inputs: stage.StageInput) -> stage.StageOutput:
+        filterbatch_outputs = inputs.as_dict(cohort, FilterBatchStage)
+        batchevidence_outputs = inputs.as_dict(cohort, GatherBatchEvidenceStage)
+        mergebatch_outputs = inputs.as_dict(workflow.get_multicohort(), MergeBatchSitesStage)
+
+        outputs = self.expected_outputs(cohort)
+
+        jobs = GenotypeBatch.create_genotypebatch_jobs(
+            cohort=cohort,
+            gatherbatchevidence_outputs=batchevidence_outputs,
+            filterbatch_outputs=filterbatch_outputs,
+            mergebatchsites_outputs=mergebatch_outputs,
+            outputs=outputs,
+        )
+
+        return self.make_outputs(cohort, data=outputs, jobs=jobs)
+
+
+@stage.stage(
+    required_stages=[
+        MakeMultiCohortCombinedPed,
+        GatherBatchEvidenceStage,
+        GenotypeBatchStage,
+        FilterBatchStage,
+    ]
+)
+class MakeCohortVcfStage(stage.MultiCohortStage):
+    """
+    Combines variants across multiple batches, resolves complex variants, re-genotypes, and performs final VCF clean-up.
+    """
+
+    def expected_outputs(self, multicohort: targets.MultiCohort) -> dict:
+        """create output paths"""
+        outputs = {
+            'vcf': self.prefix / 'cleaned.vcf.gz',
+            'vcf_index': self.prefix / 'cleaned.vcf.gz.tbi',
+        }
+        if config.config_retrieve(['MakeCohortVcf', 'MainVcfQc', 'do_per_sample_qc'], False):
+            outputs |= {'vcf_qc': self.prefix / 'cleaned_SV_VCF_QC_output.tar.gz'}
+
+        return outputs
+
+    def queue_jobs(self, multicohort: stage.MultiCohort, inputs: stage.StageInput) -> stage.StageOutput:
+        """
+        Instead of taking a direct dependency on the previous stage,
+        we use the output hash to find all the previous batches
+        """
+        gatherbatchevidence_outputs = inputs.as_dict_by_target(GatherBatchEvidenceStage)
+        genotypebatch_outputs = inputs.as_dict_by_target(GenotypeBatchStage)
+        filterbatch_outputs = inputs.as_dict_by_target(FilterBatchStage)
+        pedigree_input = inputs.as_path(target=multicohort, stage=MakeMultiCohortCombinedPed)
+
+        outputs = self.expected_outputs(multicohort)
+
+        jobs = MakeCohortVcf.create_makecohortvcf_jobs(
+            multicohort,
+            pedigree_input,
+            gatherbatchevidence_outputs,
+            genotypebatch_outputs,
+            filterbatch_outputs,
+            outputs,
+        )
+
+        return self.make_outputs(multicohort, data=outputs, jobs=jobs)
+
+
 def cli_main():
     """
     CLI entrypoint - starts up the workflow
@@ -370,6 +481,8 @@ def cli_main():
             FilterBatchStage,
             MergeBatchSitesStage,
             CombineExclusionListsStage,
+            GenotypeBatchStage,
+            MakeCohortVcfStage,
         ],
         dry_run=args.dry_run,
     )
