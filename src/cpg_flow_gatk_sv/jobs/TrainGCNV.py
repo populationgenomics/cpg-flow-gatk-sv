@@ -52,19 +52,13 @@ def add_train_gcnv_jobs(cohort: targets.Cohort, output_dict: dict[str, Path]):
         ]
     }
 
-    # billing labels!
+    # billing labels must conform to the regex [a-z]([-a-z0-9]*[a-z0-9])?
     # https://cromwell.readthedocs.io/en/stable/wf_options/Google/
-    # these must conform to the regex [a-z]([-a-z0-9]*[a-z0-9])?
-    billing_labels = {
-        'stage': 'traingcnv',
-        config.AR_GUID_NAME: config.try_get_ar_guid(),
-    }
-
     return utils.add_gatk_sv_jobs(
         dataset=cohort.dataset,
         wfl_name='TrainGCNV',
         input_dict=cromwell_input_dict,
         expected_out_dict=output_dict,
-        labels=billing_labels,
+        labels={'stage': 'traingcnv', config.AR_GUID_NAME: config.try_get_ar_guid()},
         job_size=utils.CromwellJobSizes.MEDIUM,
     )

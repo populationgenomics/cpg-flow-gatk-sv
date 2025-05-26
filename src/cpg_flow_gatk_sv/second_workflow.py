@@ -6,7 +6,7 @@ import argparse
 
 from cpg_flow import stage, targets, workflow
 from cpg_flow_gatk_sv import utils
-from cpg_flow_gatk_sv.jobs import GatherBatchEvidence, TrainGCNV
+from cpg_flow_gatk_sv.jobs import GatherBatchEvidence, TrainGCNV, ClusterBatch
 from cpg_utils import Path, config
 
 
@@ -139,6 +139,44 @@ class GatherBatchEvidenceStage(stage.CohortStage):
         return self.make_outputs(cohort, data=outputs, jobs=jobs)
 
 
+@stage.stage(required_stages=[MakeCohortCombinedPed, GatherBatchEvidenceStage])
+class ClusterBatchStage(stage.CohortStage):
+    """
+    https://github.com/broadinstitute/gatk-sv#clusterbatch
+    """
+
+    def expected_outputs(self, cohort: targets.Cohort) -> dict:
+        """
+        * Clustered SV VCFs
+        * Clustered depth-only call VCF
+        """
+
+        ending_by_key = {}
+
+        for caller in utils.SV_CALLERS + ['depth']:
+            ending_by_key[f'clustered_{caller}_vcf'] = f'clustered-{caller}.vcf.gz'
+            ending_by_key[f'clustered_{caller}_vcf_index'] = f'clustered-{caller}.vcf.gz.tbi'
+        return {key: self.get_stage_cohort_prefix(cohort) / fname for key, fname in ending_by_key.items()}
+
+    def queue_jobs(self, cohort: targets.Cohort, inputs: stage.StageInput) -> stage.StageOutput:
+        """
+        Standardized call VCFs (GatherBatchEvidence)
+        Depth-only (DEL/DUP) calls (GatherBatchEvidence)
+        """
+        batch_evidence_outputs = inputs.as_dict(cohort, GatherBatchEvidenceStage)
+        pedigree_input = inputs.as_str(target=cohort, stage=MakeCohortCombinedPed)
+
+        outputs = self.expected_outputs(cohort)
+
+        jobs = ClusterBatch.create_cluster_batch_jobs(
+            pedigree_input=pedigree_input,
+            cohort=cohort,
+            batch_evidence_outputs=batch_evidence_outputs,
+            outputs=outputs,
+        )
+        return self.make_outputs(cohort, data=outputs, jobs=jobs)
+
+
 def cli_main():
     """
     CLI entrypoint - starts up the workflow
@@ -148,7 +186,13 @@ def cli_main():
     args = parser.parse_args()
 
     workflow.run_workflow(
-        stages=[TrainGcnvStage, MakeCohortCombinedPed, MakeMultiCohortCombinedPed, GatherBatchEvidenceStage],
+        stages=[
+            TrainGcnvStage,
+            MakeCohortCombinedPed,
+            MakeMultiCohortCombinedPed,
+            GatherBatchEvidenceStage,
+            ClusterBatch,
+        ],
         dry_run=args.dry_run,
     )
 
