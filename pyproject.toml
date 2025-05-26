@@ -113,6 +113,7 @@ hail = ["hail"]
 
 [tool.ruff.lint.per-file-ignores]
 "src/cpg_flow_gatk_sv/first_workflow.py" = ["ARG002"]
+"src/cpg_flow_gatk_sv/second_workflow.py" = ["ARG002"]
 
 [tool.bumpversion]
 current_version = "0.1.1"

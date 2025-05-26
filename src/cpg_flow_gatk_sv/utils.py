@@ -2,13 +2,14 @@
 Common methods for all GATK-SV workflows
 """
 
+import itertools
 import re
+from collections import defaultdict
 from enum import Enum
 from functools import cache
 from os.path import join
 from random import randint
 from typing import TYPE_CHECKING, Any
-import itertools
 
 import loguru
 
@@ -213,33 +214,6 @@ def add_gatk_sv_jobs(
     return [submit_j, copy_j]
 
 
-def get_ref_panel(keys: list[str] | None = None) -> dict:
-    # mandatory config entry
-    ref_panel_samples = config.config_retrieve(['sv_ref_panel', 'ref_panel_samples'])
-    return {
-        k: v
-        for k, v in {
-            'ref_panel_samples': ref_panel_samples,
-            'ref_panel_bincov_matrix': config.reference_path('broad/ref_panel_bincov_matrix'),
-            'contig_ploidy_model_tar': config.reference_path('gatk_sv/contig_ploidy_model_tar'),
-            'gcnv_model_tars': [
-                str(config.reference_path('gatk_sv/model_tar_tmpl')).format(shard=i)
-                for i in range(config.config_retrieve(['sv_ref_panel', 'model_tar_cnt']))
-            ],
-            'ref_panel_PE_files': [
-                config.reference_path('gatk_sv/ref_panel_PE_file_tmpl').format(sample=s) for s in ref_panel_samples
-            ],
-            'ref_panel_SR_files': [
-                config.reference_path('gatk_sv/ref_panel_SR_file_tmpl').format(sample=s) for s in ref_panel_samples
-            ],
-            'ref_panel_SD_files': [
-                config.reference_path('gatk_sv/ref_panel_SD_file_tmpl').format(sample=s) for s in ref_panel_samples
-            ],
-        }.items()
-        if not keys or k in keys
-    }
-
-
 def clean_ped_family_id(family_id: str) -> str:
     """
     Takes a family ID from the pedigree and cleans it up
@@ -319,47 +293,6 @@ def make_combined_ped(cohort: targets.Cohort | targets.MultiCohort, combined_ped
         out.write(ref_ped.read())
 
 
-def queue_annotate_sv_jobs(
-    multicohort: targets.MultiCohort,
-    prefix: Path,
-    input_vcf: Path,
-    outputs: dict,
-    labels: dict[str, str] | None = None,
-) -> list['BashJob']:
-    """
-    Helper function to queue jobs for SV annotation
-    Enables common access to the same Annotation WDL for CNV & SV
-    """
-    input_dict: dict[str, Any] = {
-        'vcf': input_vcf,
-        'prefix': multicohort.name,
-        'ped_file': make_combined_ped(multicohort, prefix),
-        'sv_per_shard': 5000,
-        'external_af_population': config.config_retrieve(['references', 'gatk_sv', 'external_af_population']),
-        'external_af_ref_prefix': config.config_retrieve(['references', 'gatk_sv', 'external_af_ref_bed_prefix']),
-        'external_af_ref_bed': config.config_retrieve(['references', 'gnomad_sv']),
-        'use_hail': False,
-    }
-
-    input_dict |= get_references(
-        [
-            'noncoding_bed',
-            'protein_coding_gtf',
-            {'contig_list': 'primary_contigs_list'},
-        ],
-    )
-
-    # images!
-    input_dict |= get_images(['sv_pipeline_docker', 'sv_base_mini_docker', 'gatk_docker'])
-    return add_gatk_sv_jobs(
-        dataset=multicohort.analysis_dataset,
-        wfl_name='AnnotateVcf',
-        input_dict=input_dict,
-        expected_out_dict=outputs,
-        labels=labels,
-    )
-
-
 def queue_annotate_strvctvre_job(
     input_vcf,
     output_path: str,
@@ -433,3 +366,19 @@ def check_for_cohort_overlaps(multicohort: targets.MultiCohort):
     # upon findings any errors, raise an Exception and die
     if errors:
         raise ValueError('\n'.join(errors))
+
+
+def check_paths_exist(input_dict: dict[str, Any]):
+    """
+    Check that all paths in the input_dict exist
+    """
+    invalid_paths = defaultdict(list)
+    for k in ['counts', 'PE_files', 'SD_files', 'SR_files'] + [f'{caller}_vcfs' for caller in SV_CALLERS]:
+        for str_path in input_dict[k]:
+            path = to_path(str_path)
+            if not path.exists():
+                sg_id = path.name.split('/')[-1].split('.')[0]
+                invalid_paths[sg_id].append(str_path)
+    if invalid_paths:
+        error_str = '\n'.join([f'{k}: {", ".join(v)}' for k, v in invalid_paths.items()])
+        raise FileNotFoundError(f'The following paths do not exist:\n{error_str}')
