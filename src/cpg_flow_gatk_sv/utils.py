@@ -15,6 +15,7 @@ import loguru
 
 from cpg_flow import targets, utils
 from cpg_utils import Path, config, cromwell, hail_batch, to_path
+from metamist.graphql import gql, query
 
 if TYPE_CHECKING:
     from hailtop.batch.job import BashJob
@@ -24,6 +25,20 @@ SV_CALLERS = ['manta', 'wham', 'scramble']
 
 _FASTA_STRING = None
 PED_FAMILY_ID_REGEX = re.compile(r'(^[A-Za-z0-9_]+$)')
+
+
+VCF_QUERY = gql(
+    """
+    query MyQuery($dataset: String!) {
+        project(name: $dataset) {
+            analyses(active: {eq: true}, type: {eq: "sv"}, status: {eq: COMPLETED}) {
+                output
+                timestampCompleted
+            }
+        }
+    }
+""",
+)
 
 
 class CromwellJobSizes(Enum):
@@ -361,3 +376,38 @@ def check_paths_exist(input_dict: dict[str, Any]):
     if invalid_paths:
         error_str = '\n'.join([f'{k}: {", ".join(v)}' for k, v in invalid_paths.items()])
         raise FileNotFoundError(f'The following paths do not exist:\n{error_str}')
+
+
+@cache
+def query_for_spicy_vcf(dataset: str) -> str | None:
+    """
+    query for the most recent previous SpiceUpSVIDs VCF
+    the SpiceUpSVIDs Stage involves overwriting the generic sequential variant IDs
+    with meaningful Identifiers, so we can track the same variant across different callsets
+
+    Args:
+        dataset (str): project to query for
+
+    Returns:
+        str, the path to the latest Spicy VCF
+        or None, if there are no Spicy VCFs
+    """
+
+    # hot swapping to a string we can freely modify
+    query_dataset = dataset
+
+    if config.config_retrieve(['workflow', 'access_level']) == 'test' and 'test' not in query_dataset:
+        query_dataset += '-test'
+
+    result = query(VCF_QUERY, variables={'dataset': query_dataset})
+    spice_by_date: dict[str, str] = {}
+    for analysis in result['project']['analyses']:
+        if analysis['output'] and analysis['output'].endswith('fresh_ids.vcf.bgz'):
+            spice_by_date[analysis['timestampCompleted']] = analysis['output']
+
+    if not spice_by_date:
+        return None
+
+    # return the latest, determined by a sort on timestamp
+    # 2023-10-10... > 2023-10-09..., so sort on strings
+    return spice_by_date[sorted(spice_by_date)[-1]]

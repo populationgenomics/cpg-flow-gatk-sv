@@ -4,6 +4,8 @@ All post-batching stages of the GATK-SV workflow
 
 import argparse
 
+import loguru
+
 from cpg_flow import stage, targets, workflow
 from cpg_flow_gatk_sv import utils
 from cpg_flow_gatk_sv.jobs import (
@@ -21,6 +23,7 @@ from cpg_flow_gatk_sv.jobs import (
     SVConcordance,
     GeneratePloidyTable,
     FilterGenotypes,
+    FilterWham,
 )
 from cpg_utils import Path, config
 
@@ -614,98 +617,76 @@ class FilterGenotypesStage(stage.MultiCohortStage):
         return self.make_outputs(multicohort, data=outputs, jobs=jobs)
 
 
-# @stage(required_stages=FilterGenotypes)
-# class UpdateStructuralVariantIDs(MultiCohortStage):
-#     """
-#     Runs SVConcordance between the results of this callset and the results of a previous callset
-#     This causes the Variant IDs of a matching variant to be updated to the previous callset's ID
-#     Consistency of Variant ID is crucial to Seqr/AIP identifying the same variant across different callsets
-#     By default GATK-SV creates an auto-incrementing ID, rather than one based on variant attributes
-#     If a new call is added at a chromosome start for any sample, the ID for all variants on the chromosome
-#     will be shifted up, meaning that Seqr labels/any other process linked to the ID will be incorrect
-#     """
-#
-#     def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
-#         return {
-#             'concordance_vcf': self.prefix / 'updated_ids.vcf.gz',
-#             'concordance_vcf_index': self.prefix / 'updated_ids.vcf.gz.tbi',
-#         }
-#
-#     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
-#
-#         # allow for no prior name/IDs
-#         if not (spicy_vcf := query_for_spicy_vcf(multicohort.analysis_dataset.name)):
-#             get_logger().info('No previous Spicy VCF found for {cohort.analysis_dataset.name}')
-#             return self.make_outputs(multicohort, skipped=True)
-#
-#         expected_d = self.expected_outputs(multicohort)
-#
-#         # run concordance between this and the previous VCF
-#         input_dict: dict = {
-#             'output_prefix': multicohort.name,
-#             'reference_dict': str(get_fasta().with_suffix('.dict')),
-#             'eval_vcf': inputs.as_path(multicohort, FilterGenotypes, key='filtered_vcf'),
-#             'truth_vcf': spicy_vcf,
-#         }
-#         input_dict |= get_images(['gatk_docker', 'sv_base_mini_docker'])
-#         input_dict |= get_references([{'contig_list': 'primary_contigs_list'}])
-#
-#         jobs = add_gatk_sv_jobs(
-#             dataset=multicohort.analysis_dataset,
-#             wfl_name='SVConcordance',
-#             input_dict=input_dict,
-#             expected_out_dict=expected_d,
-#             labels={'stage': self.name.lower(), AR_GUID_NAME: try_get_ar_guid()},
-#         )
-#         return self.make_outputs(multicohort, data=expected_d, jobs=jobs)
-#
-#
-# @stage(
-#     required_stages=[FilterGenotypes, UpdateStructuralVariantIDs],
-#     analysis_type='sv',
-#     analysis_keys=['wham_filtered_vcf'],
-# )
-# class FilterWham(MultiCohortStage):
-#     """
-#     Filters the VCF to remove deletions only called by Wham
-#     github.com/broadinstitute/gatk-sv/blob/main/wdl/ApplyManualVariantFilter.wdl
-#     """
-#
-#     def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
-#         # index here is implicit
-#         return {'wham_filtered_vcf': self.prefix / 'filtered.vcf.bgz'}
-#
-#     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
-#         """
-#         configure and queue jobs for SV annotation
-#         passing the VCF Index has become implicit, which may be a problem for us
-#         """
-#         # read the concordance-with-prev-batch VCF if appropriate, otherwise use the filtered VCF
-#         if query_for_spicy_vcf(multicohort.analysis_dataset.name):
-#             get_logger().info(f'Variant IDs were updated for {multicohort.analysis_dataset.name}')
-#             input_vcf = inputs.as_dict(multicohort, UpdateStructuralVariantIDs)['concordance_vcf']
-#         else:
-#             get_logger().info(f'No Spicy VCF was found, default IDs for {multicohort.analysis_dataset.name}')
-#             input_vcf = inputs.as_dict(multicohort, FilterGenotypes)['filtered_vcf']
-#
-#         in_vcf = get_batch().read_input_group(**{'vcf.gz': input_vcf, 'vcf.gz.tbi': f'{input_vcf}.tbi'})['vcf.gz']
-#         job = get_batch().new_job('Filter Wham', attributes={'tool': 'bcftools'})
-#         job.image(image_path('bcftools')).cpu(1).memory('highmem').storage('20Gi')
-#         job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
-#         job.command(
-#             'bcftools view -e \'SVTYPE=="DEL" && COUNT(ALGORITHMS)==1 && ALGORITHMS=="wham"\' '
-#             f'{in_vcf} | bgzip -c  > {job.output["vcf.bgz"]}',
-#         )
-#         job.command(f'tabix {job.output["vcf.bgz"]}')
-#         get_batch().write_output(
-#             job.output,
-#             str(self.expected_outputs(multicohort)['wham_filtered_vcf']).replace('.vcf.bgz', ''),
-#         )
-#
-#         expected_d = self.expected_outputs(multicohort)
-#         return self.make_outputs(multicohort, data=expected_d, jobs=job)
-#
-#
+@stage.stage(required_stages=FilterGenotypesStage)
+class UpdateStructuralVariantIDs(stage.MultiCohortStage):
+    """
+    Runs SVConcordance between the results of this callset and the results of a previous callset
+    This causes the Variant IDs of a matching variant to be updated to the previous callset's ID
+    Consistency of Variant ID is crucial to Seqr/AIP identifying the same variant across different callsets
+    By default GATK-SV creates an auto-incrementing ID, rather than one based on variant attributes
+    If a new call is added at a chromosome start for any sample, the ID for all variants on the chromosome
+    will be shifted up, meaning that Seqr labels/any other process linked to the ID will be incorrect
+    """
+
+    def expected_outputs(self, multicohort: targets.MultiCohort) -> dict[str, Path]:
+        return {
+            'concordance_vcf': self.prefix / 'updated_ids.vcf.gz',
+            'concordance_vcf_index': self.prefix / 'updated_ids.vcf.gz.tbi',
+        }
+
+    def queue_jobs(self, multicohort: targets.MultiCohort, inputs: stage.StageInput) -> stage.StageOutput:
+        # allow for no prior name/IDs
+        if not (spicy_vcf := utils.query_for_spicy_vcf(multicohort.analysis_dataset.name)):
+            loguru.logger.info('No previous Spicy VCF found for {cohort.analysis_dataset.name}')
+            return self.make_outputs(multicohort, skipped=True)
+
+        outputs = self.expected_outputs(multicohort)
+
+        filter_genotypes_output = inputs.as_str(multicohort, FilterGenotypesStage, key='filtered_vcf')
+
+        jobs = SVConcordance.create_sv_concordance_jobs(
+            multicohort=multicohort,
+            formatvcf_output=filter_genotypes_output,
+            joinrawcalls_output=spicy_vcf,
+            outputs=outputs,
+        )
+
+        return self.make_outputs(multicohort, data=outputs, jobs=jobs)
+
+
+@stage.stage(
+    required_stages=[FilterGenotypesStage, UpdateStructuralVariantIDs],
+    analysis_type='sv',
+)
+class FilterWhamStage(stage.MultiCohortStage):
+    """
+    Filters the VCF to remove deletions only called by Wham
+    github.com/broadinstitute/gatk-sv/blob/main/wdl/ApplyManualVariantFilter.wdl
+    """
+
+    def expected_outputs(self, multicohort: targets.MultiCohort) -> Path:
+        return self.prefix / 'filtered.vcf.bgz'
+
+    def queue_jobs(self, multicohort: targets.MultiCohort, inputs: stage.StageInput) -> stage.StageOutput:
+        """
+        configure and queue jobs for SV annotation
+        passing the VCF Index has become implicit, which may be a problem for us
+        """
+        # read the concordance-with-prev-batch VCF if appropriate, otherwise use the filtered VCF
+        if utils.query_for_spicy_vcf(multicohort.analysis_dataset.name):
+            loguru.logger.info(f'Variant IDs were updated for {multicohort.analysis_dataset.name}')
+            input_vcf = inputs.as_str(multicohort, UpdateStructuralVariantIDs, 'concordance_vcf')
+        else:
+            loguru.logger.info(f'No Spicy VCF was found, default IDs for {multicohort.analysis_dataset.name}')
+            input_vcf = inputs.as_str(multicohort, FilterGenotypesStage, 'filtered_vcf')
+
+        output = self.expected_outputs(multicohort)
+
+        job = FilterWham.create_filter_wham_jobs(input_vcf, output=str(output))
+
+        return self.make_outputs(multicohort, data=output, jobs=job)
+
+
 # @stage(required_stages=[FilterWham], analysis_type='sv', analysis_keys=['annotated_vcf'])
 # class AnnotateVcf(MultiCohortStage):
 #     """
