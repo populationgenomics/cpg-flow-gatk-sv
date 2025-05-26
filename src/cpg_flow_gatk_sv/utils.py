@@ -115,14 +115,15 @@ def get_references(keys: list[str | dict[str, str]]) -> dict[str, str | list[str
     res: dict[str, str | list[str]] = {}
     for key in keys:
         # Keys can be maps (e.g. {'MakeCohortVcf.cytobands': 'cytoband'})
-        ref_d_key = next(iter(key.values())) if isinstance(key, dict) else key
+        use_key, ref_key = next(iter(key.items())) if isinstance(key, dict) else (key, key)
 
         # e.g. GATKSVPipelineBatch.rmsk -> rmsk
-        ref_d_key = ref_d_key.split('.')[-1]
+        ref_key = ref_key.split('.')[-1]
+
         try:
-            res[key] = config.reference_path(f'gatk_sv/{ref_d_key}')  # type: ignore[index]
+            res[use_key] = config.reference_path(f'gatk_sv/{ref_key}')  # type: ignore[index]
         except (KeyError, config.ConfigError):
-            res[key] = config.reference_path(f'broad/{ref_d_key}')  # type: ignore[index]
+            res[use_key] = config.reference_path(f'broad/{ref_key}')  # type: ignore[index]
 
     return res
 
