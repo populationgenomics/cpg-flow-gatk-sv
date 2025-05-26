@@ -6,7 +6,7 @@ import argparse
 
 from cpg_flow import stage, targets, workflow
 from cpg_flow_gatk_sv import utils
-from cpg_flow_gatk_sv.jobs import GatherBatchEvidence, TrainGCNV, ClusterBatch
+from cpg_flow_gatk_sv.jobs import ClusterBatch, GatherBatchEvidence, TrainGCNV
 from cpg_utils import Path, config
 
 
@@ -153,9 +153,10 @@ class ClusterBatchStage(stage.CohortStage):
 
         ending_by_key = {}
 
-        for caller in utils.SV_CALLERS + ['depth']:
+        for caller in [*utils.SV_CALLERS, 'depth']:
             ending_by_key[f'clustered_{caller}_vcf'] = f'clustered-{caller}.vcf.gz'
             ending_by_key[f'clustered_{caller}_vcf_index'] = f'clustered-{caller}.vcf.gz.tbi'
+
         return {key: self.get_stage_cohort_prefix(cohort) / fname for key, fname in ending_by_key.items()}
 
     def queue_jobs(self, cohort: targets.Cohort, inputs: stage.StageInput) -> stage.StageOutput:
