@@ -32,8 +32,9 @@ def create_gather_sample_evidence_jobs(
     # If DRAGEN input is going to be used, first the input parameter 'is_dragen_3_7_8' needs to be set to True
     # then some parameters need to be added to the input_dict to enable BWA to be run
 
-    input_dict |= utils.get_images(
-        [
+    input_dict |= {
+        key: config.config_retrieve(['images', key])
+        for key in [
             'sv_pipeline_docker',
             'sv_base_mini_docker',
             'samtools_cloud_docker',
@@ -44,8 +45,9 @@ def create_gather_sample_evidence_jobs(
             'gatk_docker_pesr_override',
             'genomes_in_the_cloud_docker',
             'cloud_sdk_docker',
-        ],
-    )
+        ]
+    }
+
     input_dict |= utils.get_references(
         [
             'primary_contigs_fai',

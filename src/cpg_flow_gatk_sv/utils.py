@@ -86,28 +86,6 @@ def get_fasta_string() -> Path:
     return _FASTA_STRING
 
 
-def get_images(keys: list[str], allow_missing=False) -> dict[str, str]:
-    """
-    Dict of WDL inputs with docker image paths.
-
-    Args:
-        keys (list): all the images to get
-        allow_missing (bool): if False, require all query keys to be found
-
-    Returns:
-        dict of image keys to image paths
-        or AssertionError
-    """
-    image_keys = config.config_retrieve(['images']).keys()
-
-    if not allow_missing:
-        query_keys = set(keys)
-        if not query_keys.issubset(image_keys):
-            raise KeyError(f'Unknown image keys: {query_keys - image_keys}')
-
-    return {k: config.image_path(k) for k in image_keys if k in keys}
-
-
 def get_references(keys: list[str | dict[str, str]]) -> dict[str, str | list[str]]:
     """
     Dict of WDL inputs with reference file paths.

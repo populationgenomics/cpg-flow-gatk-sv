@@ -41,15 +41,16 @@ def add_train_gcnv_jobs(cohort: targets.Cohort, output_dict: dict[str, Path]):
     }
 
     # add the images required for this step
-    cromwell_input_dict |= utils.get_images(
-        [
+    cromwell_input_dict |= {
+        key: config.config_retrieve(['images', key])
+        for key in [
             'sv_base_mini_docker',
             'linux_docker',
             'gatk_docker',
             'condense_counts_docker',
             'sv_pipeline_docker',
         ]
-    )
+    }
 
     # billing labels!
     # https://cromwell.readthedocs.io/en/stable/wf_options/Google/

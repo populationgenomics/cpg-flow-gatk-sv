@@ -100,8 +100,9 @@ def submit_gatherbatchevidence_jobs(
         ],
     }
 
-    input_dict |= utils.get_images(
-        [
+    input_dict |= {
+        key: config.config_retrieve(['images', key])
+        for key in [
             'sv_base_mini_docker',
             'sv_base_docker',
             'sv_pipeline_docker',
@@ -110,8 +111,8 @@ def submit_gatherbatchevidence_jobs(
             'condense_counts_docker',
             'gatk_docker',
             'cnmops_docker',
-        ],
-    )
+        ]
+    }
 
     # this step runs for approximately 15 hours
     return utils.add_gatk_sv_jobs(
