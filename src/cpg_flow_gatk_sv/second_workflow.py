@@ -13,6 +13,7 @@ from cpg_flow_gatk_sv.jobs import (
     GenerateBatchMetrics,
     TrainGCNV,
     MergeBatchSites,
+    CombineExclusionLists,
 )
 from cpg_utils import Path, config
 
@@ -313,6 +314,43 @@ class MergeBatchSitesStage(stage.MultiCohortStage):
         return self.make_outputs(multicohort, data=outputs, jobs=jobs)
 
 
+@stage.stage(analysis_type='sv', required_stages=FilterBatchStage)
+class CombineExclusionListsStage(stage.MultiCohortStage):
+    """
+    Takes the per-batch lists of excluded sample IDs and combines
+    them into a single file for use in the SV pipeline
+
+    This will be used to remove any filtered samples from consideration in
+    subsequent stages, and to remove the CPG ID registration
+    """
+
+    def expected_outputs(self, multicohort: targets.MultiCohort) -> Path:
+        """
+        Create dictionary of names -> output paths
+        This variable is a Path to make sure it gets existence checked
+        We need this quick stage to run each time
+        """
+
+        return self.prefix / 'combined_exclusion_list.txt'
+
+    def queue_jobs(self, multicohort: targets.MultiCohort, inputs: stage.StageInput) -> stage.StageOutput:
+        """
+        queue job to combine exclusion lists
+        """
+
+        filter_batch_outputs = inputs.as_dict_by_target(FilterBatchStage)
+        all_filter_lists = [
+            str(filter_batch_outputs[cohort.id]['outlier_samples_excluded_file'])
+            for cohort in multicohort.get_cohorts()
+        ]
+
+        output = self.expected_outputs(multicohort)
+
+        job = CombineExclusionLists.create_combine_exclusion_lists_job(all_filter_lists, output)
+
+        return self.make_outputs(multicohort, data=output, jobs=job)
+
+
 def cli_main():
     """
     CLI entrypoint - starts up the workflow
@@ -331,6 +369,7 @@ def cli_main():
             GenerateBatchMetricsStage,
             FilterBatchStage,
             MergeBatchSitesStage,
+            CombineExclusionListsStage,
         ],
         dry_run=args.dry_run,
     )
