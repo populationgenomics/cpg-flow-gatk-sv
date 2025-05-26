@@ -6,7 +6,14 @@ import argparse
 
 from cpg_flow import stage, targets, workflow
 from cpg_flow_gatk_sv import utils
-from cpg_flow_gatk_sv.jobs import ClusterBatch, FilterBatch, GatherBatchEvidence, GenerateBatchMetrics, TrainGCNV
+from cpg_flow_gatk_sv.jobs import (
+    ClusterBatch,
+    FilterBatch,
+    GatherBatchEvidence,
+    GenerateBatchMetrics,
+    TrainGCNV,
+    MergeBatchSites,
+)
 from cpg_utils import Path, config
 
 
@@ -273,6 +280,39 @@ class FilterBatchStage(stage.CohortStage):
         return self.make_outputs(cohort, data=outputs, jobs=jobs)
 
 
+@stage.stage(required_stages=FilterBatchStage)
+class MergeBatchSitesStage(stage.MultiCohortStage):
+    """
+    This Stage runs between GenerateBatchMetrics and FilterBatch
+    This takes the component VCFs from individual batches and merges them into
+    a single VCF (one for PESR and one for depth-only calls).å
+    """
+
+    def expected_outputs(self, multicohort: targets.MultiCohort) -> dict[str, Path]:
+        return {
+            'cohort_pesr_vcf': self.prefix / 'cohort_pesr.vcf.gz',
+            'cohort_depth_vcf': self.prefix / 'cohort_depth.vcf.gz',
+        }
+
+    def queue_jobs(self, multicohort: targets.MultiCohort, inputs: stage.StageInput) -> stage.StageOutput:
+        # take from previous per-cohort outputs
+        filter_batch_outputs = inputs.as_dict_by_target(FilterBatchStage)
+
+        pesr_vcfs = [filter_batch_outputs[cohort.id]['filtered_pesr_vcf'] for cohort in multicohort.get_cohorts()]
+        depth_vcfs = [filter_batch_outputs[cohort.id]['filtered_depth_vcf'] for cohort in multicohort.get_cohorts()]
+
+        outputs = self.expected_outputs(multicohort)
+
+        jobs = MergeBatchSites.create_mergebatchsites_jobs(
+            multicohort=multicohort,
+            pesr_vcfs=pesr_vcfs,
+            depth_vcfs=depth_vcfs,
+            outputs=outputs,
+        )
+
+        return self.make_outputs(multicohort, data=outputs, jobs=jobs)
+
+
 def cli_main():
     """
     CLI entrypoint - starts up the workflow
@@ -290,6 +330,7 @@ def cli_main():
             ClusterBatch,
             GenerateBatchMetricsStage,
             FilterBatchStage,
+            MergeBatchSitesStage,
         ],
         dry_run=args.dry_run,
     )
