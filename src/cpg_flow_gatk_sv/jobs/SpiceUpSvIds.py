@@ -18,6 +18,7 @@ def create_spicy_jobs(
     # update the IDs using a PythonJob
     job = hail_batch.get_batch().new_bash_job('rename_sv_ids')
     job.storage('10Gi')
+    job.image(config.config_retrieve(['workflow', 'driver_image']))
 
     job.command(f"""
     python -m cpg_flow_gatk_sv.scripts.rename_sv_ids \
