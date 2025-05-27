@@ -1,14 +1,6 @@
-FROM australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_hail_gcloud:0.2.134.cpg1 AS basic
+FROM australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_hail_gcloud:0.2.134.cpg2-1 AS basic
 
 ENV PYTHONDONTWRITEBYTECODE=1
-
-RUN apt-get update && \
-    DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y \
-        curl \
-        git \
-        jq && \
-    rm -r /var/lib/apt/lists/* && \
-    rm -r /var/cache/apt/*
 
 # now do some fun stuff, installing ClinvArbitration
 WORKDIR /cpg_flow_gatk_sv
