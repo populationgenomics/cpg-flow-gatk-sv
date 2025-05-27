@@ -1,10 +1,6 @@
 from typing import TYPE_CHECKING
-
-from cpg_flow import targets
 from cpg_flow_gatk_sv import utils
-from cpg_utils import Path, config, hail_batch
-
-from cpg_flow_gatk_sv.scripts import ploidy_table_from_ped
+from cpg_utils import config, hail_batch
 
 if TYPE_CHECKING:
     from hailtop.batch.job import BashJob
@@ -13,7 +9,7 @@ if TYPE_CHECKING:
 def create_generate_ploidy_jobs(
     pedigree: str,
     output: str,
-) -> BashJob:
+) -> 'BashJob':
     """
 
     Args:

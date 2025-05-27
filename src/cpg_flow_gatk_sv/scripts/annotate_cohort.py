@@ -123,6 +123,8 @@ def annotate_cohort_sv(vcf_path: str, out_mt_path: str, gencode_gz: str, checkpo
         checkpoint_path (str): CHECKPOINT!@!!
     """
 
+    hail_batch.init_batch()
+
     loguru.logger.info(f'Importing SV VCF {vcf_path}')
     mt = hl.import_vcf(
         vcf_path,

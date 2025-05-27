@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 def create_filter_wham_jobs(
     input_vcf: str,
     output: str,
-) -> BashJob:
+) -> 'BashJob':
     in_vcf = hail_batch.get_batch().read_input_group(**{'vcf.gz': input_vcf, 'vcf.gz.tbi': f'{input_vcf}.tbi'})[
         'vcf.gz'
     ]
