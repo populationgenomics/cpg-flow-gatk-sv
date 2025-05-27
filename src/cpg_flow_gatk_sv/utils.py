@@ -2,6 +2,7 @@
 Common methods for all GATK-SV workflows
 """
 
+import functools
 import itertools
 import re
 from collections import defaultdict
@@ -13,7 +14,7 @@ from typing import TYPE_CHECKING, Any
 
 import loguru
 
-from cpg_flow import targets, utils
+from cpg_flow import targets, utils, workflow
 from cpg_utils import Path, config, cromwell, hail_batch, to_path
 from metamist.graphql import gql, query
 
@@ -411,3 +412,26 @@ def query_for_spicy_vcf(dataset: str) -> str | None:
     # return the latest, determined by a sort on timestamp
     # 2023-10-10... > 2023-10-09..., so sort on strings
     return spice_by_date[sorted(spice_by_date)[-1]]
+
+
+@functools.cache
+def write_dataset_sg_ids(dataset: targets.Dataset) -> Path:
+    """
+    For a given dataset, write all its SGs to a file.
+    Make this path specific to the dataset and run, so we can use it in multiple jobs
+
+    Args:
+        dataset ():
+
+    Returns:
+
+    """
+    sgids_list_path = dataset.tmp_prefix() / workflow.get_workflow().output_version / 'sv-sgid-list.txt'
+    if config.config_retrieve(['workflow', 'dry_run'], False):
+        return sgids_list_path
+
+    with sgids_list_path.open('w') as f:
+        for sgid in dataset.get_sequencing_group_ids():
+            f.write(f'{sgid}\n')
+
+    return sgids_list_path

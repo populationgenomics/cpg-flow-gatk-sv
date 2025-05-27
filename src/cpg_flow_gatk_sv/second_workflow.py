@@ -10,6 +10,7 @@ from cpg_flow import stage, targets, workflow
 from cpg_flow_gatk_sv import utils
 from cpg_flow_gatk_sv.jobs import (
     AnnotateCohort,
+    AnnotateDataset,
     AnnotateVcf,
     AnnotateWithStrvctvre,
     ClusterBatch,
@@ -818,51 +819,53 @@ class AnnotateCohortStage(stage.MultiCohortStage):
         return self.make_outputs(multicohort, data=output, jobs=job)
 
 
-# @stage(required_stages=[CombineExclusionLists, AnnotateCohortSv], analysis_type='sv', analysis_keys=['mt'])
-# class AnnotateDatasetSv(DatasetStage):
-#     """
-#     Subset the MT to be this Dataset only
-#     Then work up all the genotype values
-#     """
-#
-#     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
-#         """
-#         Expected to generate a matrix table
-#         """
-#         return {'mt': (dataset.prefix() / 'mt' / f'SV-{get_workflow().output_version}-{dataset.name}.mt')}
-#
-#     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
-#         """
-#         Subsets the whole MT to this cohort only
-#         Then brings a range of genotype data into row annotations
-#
-#         Args:
-#             dataset (Dataset): SGIDs specific to this dataset/project
-#             inputs ():
-#         """
-#         # only create dataset MTs for datasets specified in the config
-#         eligible_datasets = config_retrieve(['workflow', 'write_mt_for_datasets'], default=[])
-#         if dataset.name not in eligible_datasets:
-#             get_logger().info(f'Skipping AnnotateDatasetSv mt subsetting for {dataset}')
-#             return None
-#
-#         mt_path = inputs.as_path(target=get_multicohort(), stage=AnnotateCohortSv, key='mt')
-#         exclusion_file = inputs.as_path(get_multicohort(), stage=CombineExclusionLists, key='exclusion_list')
-#
-#         outputs = self.expected_outputs(dataset)
-#
-#         jobs = annotate_dataset_jobs_sv(
-#             mt_path=mt_path,
-#             sgids=dataset.get_sequencing_group_ids(),
-#             out_mt_path=outputs['mt'],
-#             tmp_prefix=self.tmp_prefix / dataset.name / 'checkpoints',
-#             job_attrs=self.get_job_attrs(dataset),
-#             exclusion_file=str(exclusion_file),
-#         )
-#
-#         return self.make_outputs(dataset, data=outputs, jobs=jobs)
-#
-#
+@stage.stage(
+    required_stages=[CombineExclusionListsStage, AnnotateCohortStage],
+    analysis_type='sv',
+)
+class AnnotateDatasetStage(stage.DatasetStage):
+    """
+    Subset the MT to be this Dataset only
+    Then work up all the genotype values
+    """
+
+    def expected_outputs(self, dataset: targets.Dataset) -> Path:
+        return dataset.prefix() / 'mt' / f'SV-{workflow.get_workflow().output_version}-{dataset.name}.mt'
+
+    def queue_jobs(self, dataset: targets.Dataset, inputs: stage.StageInput) -> stage.StageOutput | None:
+        """
+        Subsets the whole MT to this cohort only
+        Then brings a range of genotype data into row annotations
+
+        Args:
+            dataset (Dataset): SGIDs specific to this dataset/project
+            inputs ():
+        """
+        # only create dataset MTs for datasets specified in the config
+        if dataset.name not in config.config_retrieve(['workflow', 'write_mt_for_datasets'], default=[]):
+            loguru.logger.info(f'Skipping AnnotateDatasetStage mt subsetting for {dataset.name}')
+            return None
+
+        multicohort = workflow.get_multicohort()
+        cohort_mt = inputs.as_str(target=multicohort, stage=AnnotateCohortStage)
+        exclusion_file = inputs.as_str(multicohort, stage=CombineExclusionListsStage)
+
+        output = self.expected_outputs(dataset)
+
+        dataset_sgid_file = utils.write_dataset_sg_ids(dataset)
+
+        job = AnnotateDataset.create_annotate_dataset_jobs(
+            mt=cohort_mt,
+            sgid_file=dataset_sgid_file,
+            mt_out=output,
+            dataset_mt=self.tmp_prefix / f'{dataset.name}_subset.mt',
+            job_attrs=self.get_job_attrs(dataset),
+            exclusion_file=exclusion_file,
+        )
+
+        return self.make_outputs(dataset, data=output, jobs=job)
+
+
 # @stage(
 #     required_stages=[AnnotateDatasetSv],
 #     analysis_type='es-index',  # specific type of es index
@@ -1000,6 +1003,7 @@ def cli_main():
             AnnotateVcfStage,
             AnnotateVcfWithStrvctvreStage,
             AnnotateCohortStage,
+            AnnotateDatasetStage,
         ],
         dry_run=args.dry_run,
     )
