@@ -9,6 +9,7 @@ import loguru
 from cpg_flow import stage, targets, workflow
 from cpg_flow_gatk_sv import utils
 from cpg_flow_gatk_sv.jobs import (
+    AnnotateCohort,
     AnnotateVcf,
     AnnotateWithStrvctvre,
     ClusterBatch,
@@ -787,38 +788,34 @@ class SpiceUpSvIdsStage(stage.MultiCohortStage):
         return self.make_outputs(multicohort, data=output, jobs=jobs)
 
 
-# @stage.stage(required_stages=SpiceUpSvIdsStage)
-# class AnnotateCohortSv(stage.MultiCohortStage):
-#     """
-#     First step to transform annotated SV callset data into a seqr ready format
-#     """
-#
-#     def expected_outputs(self, multicohort: targets.MultiCohort) -> Path:
-#         """
-#         Expected to write a matrix table.
-#         """
-#         return {
-#             'tmp_prefix': str(self.tmp_prefix),
-#             'mt': self.prefix / 'cohort_sv.mt',
-#         }
-#
-#     def queue_jobs(self, multicohort: targets.MultiCohort, inputs: stage.StageInput) -> stage.StageOutput:
-#         """
-#         queue job(s) to rearrange the annotations prior to Seqr transformation
-#         """
-#         outputs = self.expected_outputs(multicohort)
-#
-#         vcf_path = inputs.as_path(target=multicohort, stage=SpiceUpSvIdsStage)
-#         checkpoint_prefix = to_path(outputs['tmp_prefix']) / 'checkpoints'
-#
-#         job = annotate_cohort_jobs_sv(
-#             vcf_path=vcf_path,
-#             out_mt_path=outputs['mt'],
-#             checkpoint_prefix=self.tmp_prefix / 'checkpoints',
-#             job_attrs=self.get_job_attrs(multicohort),
-#         )
-#
-#         return self.make_outputs(multicohort, data=outputs, jobs=job)
+@stage.stage(required_stages=SpiceUpSvIdsStage)
+class AnnotateCohortStage(stage.MultiCohortStage):
+    """
+    First step to transform annotated SV callset data into a seqr ready format
+    """
+
+    def expected_outputs(self, multicohort: targets.MultiCohort) -> Path:
+        """
+        Expected to write a matrix table.
+        """
+        return self.prefix / 'cohort_sv.mt'
+
+    def queue_jobs(self, multicohort: targets.MultiCohort, inputs: stage.StageInput) -> stage.StageOutput:
+        """
+        queue job(s) to rearrange the annotations prior to Seqr transformation
+        """
+        output = self.expected_outputs(multicohort)
+
+        vcf_path = inputs.as_str(target=multicohort, stage=SpiceUpSvIdsStage)
+
+        job = AnnotateCohort.create_annotate_cohort_job(
+            vcf=vcf_path,
+            out_mt=output,
+            checkpoint=self.tmp_prefix / 'checkpoint.mt',
+            job_attrs=self.get_job_attrs(multicohort),
+        )
+
+        return self.make_outputs(multicohort, data=output, jobs=job)
 
 
 # @stage(required_stages=[CombineExclusionLists, AnnotateCohortSv], analysis_type='sv', analysis_keys=['mt'])
@@ -1002,6 +999,7 @@ def cli_main():
             FilterGenotypes,
             AnnotateVcfStage,
             AnnotateVcfWithStrvctvreStage,
+            AnnotateCohortStage,
         ],
         dry_run=args.dry_run,
     )

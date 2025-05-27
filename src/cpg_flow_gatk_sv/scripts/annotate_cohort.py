@@ -4,14 +4,12 @@ Hail Query functions for seqr loader; SV edition.
 
 import argparse
 import gzip
-import logging
-from os.path import join
+import loguru
 
 import hail as hl
 
-from cpg_utils.config import config_retrieve, reference_path
-from cpg_utils.hail_batch import genome_build
-from cpg_workflows.utils import generator_chunks, read_hail
+from cpg_utils import config, hail_batch
+
 
 # I'm just going to go ahead and steal these constants from their seqr loader
 BOTHSIDES_SUPPORT = 'BOTHSIDES_SUPPORT'
@@ -27,31 +25,6 @@ NON_GENE_PREDICTIONS = {
     'PREDICTED_NONCODING_BREAKPOINT',
     'PREDICTED_NONCODING_SPAN',
 }
-
-# path for downloading this file
-GENCODE_GTF_URL = (
-    'http://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/'
-    'release_{gencode_release}/gencode.v{gencode_release}.annotation.gtf.gz'
-)
-
-PREVIOUS_GENOTYPE_N_ALT_ALLELES = hl.dict(
-    {
-        # Map of concordance string -> previous n_alt_alleles()
-        # Concordant
-        frozenset(['TN']): 0,  # 0/0 -> 0/0
-        frozenset(['TP']): 2,  # 1/1 -> 1/1
-        frozenset(['TN', 'TP']): 1,  # 0/1 -> 0/1
-        # Novel
-        frozenset(['FP']): 0,  # 0/0 -> 1/1
-        frozenset(['TN', 'FP']): 0,  # 0/0 -> 0/1
-        # Absent
-        frozenset(['FN']): 2,  # 1/1 -> 0/0
-        frozenset(['TN', 'FN']): 1,  # 0/1 -> 0/0
-        # Discordant
-        frozenset(['FP', 'TP']): 1,  # 0/1 -> 1/1
-        frozenset(['FN', 'TP']): 2,  # 1/1 -> 0/1
-    },
-)
 
 GENCODE_FILE_HEADER = [
     'chrom',
@@ -102,21 +75,17 @@ def get_cpx_interval(x):
     return hl.struct(type=type_chr[0], chrom=chr_pos[0], start=hl.int32(pos[0]), end=hl.int32(pos[1]))
 
 
-def parse_gtf_from_local(gtf_path: str, chunk_size: int | None = None) -> hl.dict:
+def parse_gtf_from_local(gtf_path: str) -> hl.dict:
     """
     Read over the localised GTF file and read into a dict
 
-    n.b. due to a limit in Spark of 20MB per String length, the dictionary here is actually too large to be used
-    in annotation expressions. To remedy this, the dictionary is returned as a list of fragments, and we can use each
-    one in turn, then create a checkpoint between them.
     Args:
         gtf_path ():
-        chunk_size (int): if specified, returns this dict as a list of dicts
     Returns:
         the gene lookup dictionary as a Hail DictExpression
     """
     gene_id_mapping = {}
-    logging.info(f'Loading {gtf_path}')
+    loguru.logger.info(f'Loading {gtf_path}')
     with gzip.open(gtf_path, 'rt') as gencode_file:
         # iterate over this file and do all the things
         for i, line in enumerate(gencode_file):
@@ -137,19 +106,10 @@ def parse_gtf_from_local(gtf_path: str, chunk_size: int | None = None) -> hl.dic
             if info_fields['gene_name'].startswith('ENSG'):
                 continue
             gene_id_mapping[info_fields['gene_name']] = info_fields['gene_id'].split('.')[0]
-
-    all_keys = list(gene_id_mapping.keys())
-    logging.info(f'Completed ingestion of gene-ID mapping, {len(all_keys)} entries')
-    if chunk_size is None:
-        return [hl.literal(gene_id_mapping)]
-
-    # hail can't impute the type of a generator, so do this in baby steps
-    sub_dictionaries = [{key: gene_id_mapping[key] for key in keys} for keys in generator_chunks(all_keys, chunk_size)]
-
-    return [hl.literal(each_dict) for each_dict in sub_dictionaries]
+    return hl.literal(gene_id_mapping)
 
 
-def annotate_cohort_sv(vcf_path: str, out_mt_path: str, gencode_gz: str, checkpoint: str | None = None):
+def annotate_cohort_sv(vcf_path: str, out_mt_path: str, gencode_gz: str, checkpoint_path: str):
     """
     Translate an annotated SV VCF into a Seqr-ready format
     Relevant gCNV specific schema
@@ -160,16 +120,13 @@ def annotate_cohort_sv(vcf_path: str, out_mt_path: str, gencode_gz: str, checkpo
         vcf_path (str): Where is the VCF??
         out_mt_path (str): And where do you need output!?
         gencode_gz (str): The path to a compressed GENCODE GTF file
-        checkpoint (str): CHECKPOINT!@!!
+        checkpoint_path (str): CHECKPOINT!@!!
     """
 
-    logger = logging.getLogger('annotate_cohort_sv')
-    logger.setLevel(logging.INFO)
-
-    logger.info(f'Importing SV VCF {vcf_path}')
+    loguru.logger.info(f'Importing SV VCF {vcf_path}')
     mt = hl.import_vcf(
         vcf_path,
-        reference_genome=genome_build(),
+        reference_genome=hail_batch.genome_build(),
         skip_invalid_loci=True,
         force_bgz=True,
     )
@@ -177,11 +134,14 @@ def annotate_cohort_sv(vcf_path: str, out_mt_path: str, gencode_gz: str, checkpo
     # add attributes required for Seqr
     mt = mt.annotate_globals(
         sourceFilePath=vcf_path,
-        genomeVersion=genome_build().replace('GRCh', ''),
+        genomeVersion=hail_batch.genome_build().replace('GRCh', ''),
         hail_version=hl.version(),
         datasetType='SV',
     )
-    if sequencing_type := config_retrieve(['workflow', 'sequencing_type']):
+
+    mt = mt.checkpoint(checkpoint_path)
+
+    if sequencing_type := config.config_retrieve(['workflow', 'sequencing_type']):
         # Map to Seqr-style string
         # https://github.com/broadinstitute/seqr/blob/e0c179c36c0f68c892017de5eab2e4c1b9ffdc92/seqr/models.py#L592-L594
         mt = mt.annotate_globals(
@@ -192,42 +152,19 @@ def annotate_cohort_sv(vcf_path: str, out_mt_path: str, gencode_gz: str, checkpo
             }.get(sequencing_type, ''),
         )
 
-    # flexibly draw annotations depending on whether the VCF has them - this is for compatibility with Long-Read & GATK
-    # this can all be removed if/when Long-read is removed to a separate pipeline
-
-    # add end_locus, with flexibility for END2
-    if 'END2' in mt.info:
-        mt = mt.annotate_rows(
-            end_locus=hl.if_else(
-                hl.is_defined(mt.info.END2),
-                hl.struct(contig=mt.info.CHR2, position=mt.info.END2),
-                hl.struct(contig=mt.locus.contig, position=mt.info.END),
-            ),
-        )
-    else:
-        mt = mt.annotate_rows(end_locus=hl.struct(contig=mt.locus.contig, position=mt.info.END))
-
-    # GATK-SV consists of multiple algorithms, other pathways may not
-    if 'ALGORITHMS' in mt.info:
-        mt = mt.annotate_rows(algorithms=mt.info.ALGORITHMS)
-
-    # CPX_INTERVALS is not present in all VCFs
-    if 'CPX_INTERVALS' in mt.info:
-        mt = mt.annotate_rows(
-            cpx_intervals=hl.or_missing(
-                hl.is_defined(mt.info.CPX_INTERVALS),
-                mt.info.CPX_INTERVALS.map(lambda x: get_cpx_interval(x)),
-            ),
-        )
-
     # reimplementation of
     # github.com/populationgenomics/seqr-loading-pipelines..luigi_pipeline/lib/model/sv_mt_schema.py
-    population_prefix = config_retrieve(['references', 'gatk_sv', 'external_af_ref_bed_prefix'])
+    population_prefix = config.config_retrieve(['references', 'gatk_sv', 'external_af_ref_bed_prefix'])
     mt = mt.annotate_rows(
         sc=mt.info.AC[0],
         sf=mt.info.AF[0],
         sn=mt.info.AN,
         end=mt.info.END,
+        end_locus=hl.if_else(
+            hl.is_defined(mt.info.END2),
+            hl.struct(contig=mt.info.CHR2, position=mt.info.END2),
+            hl.struct(contig=mt.locus.contig, position=mt.info.END),
+        ),
         sv_callset_Het=mt.info.N_HET,
         sv_callset_Hom=mt.info.N_HOMALT,
         gnomad_svs_ID=mt.info[f'{population_prefix}_SVID'],
@@ -240,16 +177,13 @@ def annotate_cohort_sv(vcf_path: str, out_mt_path: str, gencode_gz: str, checkpo
             mt.filters,
         ),
         bothsides_support=mt.filters.any(lambda x: x == BOTHSIDES_SUPPORT),
+        algorithms=mt.info.ALGORITHMS,
+        cpx_intervals=hl.or_missing(
+            hl.is_defined(mt.info.CPX_INTERVALS),
+            mt.info.CPX_INTERVALS.map(lambda x: get_cpx_interval(x)),
+        ),
         sv_types=mt.alleles[1].replace('[<>]', '').split(':', 2),
     )
-
-    # add CPX_TYPE if not present - this is a hack to make the loader work
-    if 'CPX_TYPE' not in mt.info:
-        mt = mt.annotate_rows(info=mt.info.annotate(CPX_TYPE=mt.sv_types[0]))
-
-    # save those changes
-    if checkpoint:
-        mt = mt.checkpoint(join(checkpoint, 'initial_annotation_round.mt'))
 
     # get the Gene-Symbol mapping dict
     gene_id_mapping = parse_gtf_from_local(gencode_gz)[0]
@@ -262,7 +196,7 @@ def annotate_cohort_sv(vcf_path: str, out_mt_path: str, gencode_gz: str, checkpo
     ]
 
     # register a chain file
-    liftover_path = reference_path('liftover_38_to_37')
+    liftover_path = config.reference_path('liftover_38_to_37')
     rg37 = hl.get_reference('GRCh37')
     rg38 = hl.get_reference('GRCh38')
     rg38.add_liftover(str(liftover_path), rg37)
@@ -334,3 +268,15 @@ def annotate_cohort_sv(vcf_path: str, out_mt_path: str, gencode_gz: str, checkpo
 
     # write this output
     mt.write(out_mt_path, overwrite=True)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Annotate cohort SV VCF')
+    parser.add_argument('--vcf', required=True, help='Path to the input VCF file')
+    parser.add_argument('--output', required=True, help='Path to the output MT file')
+    parser.add_argument('--gencode_gtf', required=True, help='Path to the GENCODE GTF file (gzipped)')
+    parser.add_argument('--checkpoint', required=True, help='Checkpoint for MT')
+
+    args = parser.parse_args()
+
+    annotate_cohort_sv(args.vcf, args.output, args.gencode_gtf, args.checkpoint)
