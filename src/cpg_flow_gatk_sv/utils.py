@@ -282,6 +282,7 @@ def make_combined_ped(cohort: targets.Cohort | targets.MultiCohort, combined_ped
                         ped_dict['Phenotype'],
                     ]
                 )
+                + '\n'
             )
 
         # The ref panel PED doesn't have any header, so can safely concatenate:

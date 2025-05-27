@@ -729,7 +729,7 @@ class AnnotateVcfStage(stage.MultiCohortStage):
         """
         outputs = self.expected_outputs(multicohort)
 
-        input_vcf = inputs.as_str(multicohort, FilterWhamStage, 'wham_filtered_vcf')
+        input_vcf = inputs.as_str(multicohort, FilterWhamStage)
         pedigree = inputs.as_str(target=multicohort, stage=MakeMultiCohortCombinedPed)
 
         jobs = AnnotateVcf.create_svannotate_jobs(
