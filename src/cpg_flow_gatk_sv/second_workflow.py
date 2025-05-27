@@ -235,7 +235,7 @@ class GenerateBatchMetricsStage(stage.CohortStage):
         return self.make_outputs(cohort, data=outputs, jobs=jobs)
 
 
-@stage.stage(required_stages=[MakeCohortCombinedPed, GenerateBatchMetrics, ClusterBatch])
+@stage.stage(required_stages=[MakeCohortCombinedPed, GenerateBatchMetricsStage, ClusterBatchStage])
 class FilterBatchStage(stage.CohortStage):
     """
     Filters poor quality variants and filters outlier samples.
