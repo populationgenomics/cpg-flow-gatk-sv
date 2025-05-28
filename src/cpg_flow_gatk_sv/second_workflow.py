@@ -29,6 +29,8 @@ from cpg_flow_gatk_sv.jobs import (
     FilterGenotypes,
     FilterWham,
     SpiceUpSvIds,
+    MtToEs,
+    SplitAnnotatedSvVcf,
 )
 from cpg_utils import Path, config
 
@@ -866,114 +868,83 @@ class AnnotateDatasetStage(stage.DatasetStage):
         return self.make_outputs(dataset, data=output, jobs=job)
 
 
-# @stage(
-#     required_stages=[AnnotateDatasetSv],
-#     analysis_type='es-index',  # specific type of es index
-#     analysis_keys=['index_name'],
-#     update_analysis_meta=lambda x: {'seqr-dataset-type': 'SV'},
-# )
-# class MtToEsSv(DatasetStage):
-#     """
-#     Create a Seqr index
-#     https://github.com/populationgenomics/metamist/issues/539
-#     """
-#
-#     def expected_outputs(self, dataset: Dataset) -> dict[str, str | Path]:
-#         """
-#         Expected to generate a Seqr index, which is not a file
-#         """
-#         sequencing_type = config_retrieve(['workflow', 'sequencing_type'])
-#         index_name = f'{dataset.name}-{sequencing_type}-SV-{get_workflow().run_timestamp}'.lower()
-#         return {
-#             'index_name': index_name,
-#             'done_flag': dataset.prefix() / 'es' / f'{index_name}.done',
-#         }
-#
-#     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
-#         """
-#         Uses the non-DataProc MT-to-ES conversion script
-#         """
-#         # only create the elasticsearch index for the datasets specified in the config
-#         eligible_datasets = config_retrieve(['workflow', 'create_es_index_for_datasets'], default=[])
-#         if dataset.name not in eligible_datasets:
-#             get_logger().info(f'Skipping SV ES index creation for {dataset}')
-#             return None
-#
-#         # try to generate a password here - we'll find out inside the script anyway, but
-#         # by that point we'd already have localised the MT, wasting time and money
-#         try:
-#             _es_password_string = es_password()
-#         except PermissionDenied:
-#             get_logger().warning(f'No permission to access ES password, skipping for {dataset}')
-#             return self.make_outputs(dataset)
-#         except KeyError:
-#             get_logger().warning(f'ES section not in config, skipping for {dataset}')
-#             return self.make_outputs(dataset)
-#
-#         outputs = self.expected_outputs(dataset)
-#
-#         # get the absolute path to the MT
-#         mt_path = str(inputs.as_path(target=dataset, stage=AnnotateDatasetSv, key='mt'))
-#         # and just the name, used after localisation
-#         mt_name = mt_path.split('/')[-1]
-#
-#         # get the expected outputs as Strings
-#         index_name = str(outputs['index_name'])
-#         flag_name = str(outputs['done_flag'])
-#
-#         job = get_batch().new_job(f'Generate {index_name} from {mt_path}')
-#         # set all job attributes in one bash
-#         job.cpu(4).memory('lowmem').storage('10Gi').image(config_retrieve(['workflow', 'driver_image']))
-#
-#         # localise the MT
-#         job.command(f'gcloud --no-user-output-enabled storage cp -r {mt_path} $BATCH_TMPDIR')
-#
-#         # run the export from the localised MT - this job writes no new data, just transforms and exports over network
-#         job.command(f'mt_to_es --mt_path "${{BATCH_TMPDIR}}/{mt_name}" --index {index_name} --flag {flag_name}')
-#
-#         return self.make_outputs(dataset, data=outputs['index_name'], jobs=job)
-#
-#
-# @stage(required_stages=SpiceUpSVIDs, analysis_type='single_dataset_sv_annotated')
-# class SplitAnnotatedSvVcfByDataset(DatasetStage):
-#     """
-#     takes the whole MultiCohort annotated VCF
-#     splits it up into separate VCFs for each dataset
-#     """
-#
-#     def expected_outputs(self, dataset: Dataset) -> Path:
-#         return dataset.prefix() / 'annotated_sv.vcf.bgz'
-#
-#     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
-#         output = self.expected_outputs(dataset)
-#         input_vcf = get_batch().read_input(inputs.as_path(get_multicohort(), SpiceUpSVIDs))
-#
-#         # write a temp file for this dataset containing all relevant SGs
-#         sgids_list_path = dataset.tmp_prefix() / get_workflow().output_version / 'sgid-list.txt'
-#         if not config_retrieve(['workflow', 'dry_run'], False):
-#             with sgids_list_path.open('w') as f:
-#                 for sgid in dataset.get_sequencing_group_ids():
-#                     f.write(f'{sgid}\n')
-#         job = get_batch().new_job(
-#             name=f'SplitAnnotatedSvVcfByDataset: {dataset}',
-#             attributes=self.get_job_attrs() | {'tool': 'bcftools'},
-#         )
-#         job.image(image_path('bcftools_120'))
-#         job.cpu(1).memory('highmem').storage('10Gi')
-#         job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
-#
-#         local_sgid_file = get_batch().read_input(sgids_list_path)
-#         job.command(
-#             f'bcftools view {input_vcf} '
-#             f'--force-samples '
-#             f'-S {local_sgid_file} '
-#             f'-Oz -o {job.output["vcf.bgz"]} '
-#             f'--write-index=tbi',
-#         )
-#
-#         get_batch().write_output(job.output, str(output).removesuffix('.vcf.bgz'))
-#
-#         return self.make_outputs(dataset, data=output, jobs=job)
+@stage.stage(
+    required_stages=[AnnotateDatasetStage],
+    analysis_type='es-index',
+    analysis_keys=['index_name'],
+    update_analysis_meta=lambda x: {'seqr-dataset-type': 'SV'},
+)
+class MtToEsStage(stage.DatasetStage):
+    """
+    Create a Seqr index
+    https://github.com/populationgenomics/metamist/issues/539
+    """
+
+    def expected_outputs(self, dataset: targets.Dataset) -> dict[str, str | Path]:
+        """
+        Expected to generate a Seqr index, which is not a file
+        """
+        sequencing_type = config.config_retrieve(['workflow', 'sequencing_type'])
+        index_name = f'{dataset.name}-{sequencing_type}-SV-{workflow.get_workflow().run_timestamp}'.lower()
+        return {
+            'index_name': index_name,
+            'done_flag': dataset.prefix() / 'es' / f'{index_name}.done',
+        }
+
+    def queue_jobs(self, dataset: targets.Dataset, inputs: stage.StageInput) -> stage.StageOutput | None:
+        """
+        Uses the non-DataProc MT-to-ES conversion script
+        """
+        # only create the elasticsearch index for the datasets specified in the config
+        if dataset.name not in config.config_retrieve(['workflow', 'create_es_index_for_datasets'], default=[]):
+            loguru.logger.info(f'Skipping SV ES index creation for {dataset}')
+            return None
+
+        outputs = self.expected_outputs(dataset)
+
+        # get the absolute path to the MT
+        mt_path = inputs.as_str(target=dataset, stage=AnnotateDatasetStage)
+        job_or_none = MtToEs.create_mt_to_es_job(
+            dataset=dataset,
+            mt_path=mt_path,
+            outputs=outputs,
+            job_attrs=self.get_job_attrs(target=dataset) | {'tool': 'hail'},
+        )
+
+        return self.make_outputs(dataset, data=outputs, jobs=job_or_none)
+
+
+@stage.stage(
+    required_stages=SpiceUpSvIdsStage,
+    analysis_type='single_dataset_sv_annotated',
+)
+class SplitAnnotatedSvVcfByDataset(stage.DatasetStage):
+    """
+    takes the whole MultiCohort annotated VCF
+    splits it up into separate VCFs for each dataset
+    """
+
+    def expected_outputs(self, dataset: targets.Dataset) -> Path:
+        return (
+            dataset.prefix() / 'gatk_sv' / workflow.get_workflow().output_version / self.name / 'annotated_sv.vcf.bgz'
+        )
+
+    def queue_jobs(self, dataset: targets.Dataset, inputs: stage.StageInput) -> stage.StageOutput:
+        output = self.expected_outputs(dataset)
+
+        input_vcf = inputs.as_str(workflow.get_multicohort(), SpiceUpSvIdsStage)
+
+        dataset_sgid_file = utils.write_dataset_sg_ids(dataset)
+
+        job = SplitAnnotatedSvVcf.create_split_vcf_by_dataset_job(
+            dataset=dataset,
+            input_vcf=input_vcf,
+            dataset_sgid_file=dataset_sgid_file,
+            output=str(output),
+            job_attrs=self.get_job_attrs(dataset),
+        )
+
+        return self.make_outputs(dataset, data=output, jobs=job)
 
 
 def cli_main():
@@ -1004,6 +975,8 @@ def cli_main():
             AnnotateVcfWithStrvctvreStage,
             AnnotateCohortStage,
             AnnotateDatasetStage,
+            MtToEsStage,
+            SplitAnnotatedSvVcfByDataset,
         ],
         dry_run=args.dry_run,
     )
