@@ -3,6 +3,7 @@ Hail Query functions for seqr loader; SV edition.
 """
 
 import argparse
+
 import loguru
 
 import hail as hl
@@ -84,16 +85,16 @@ def annotate_dataset(mt_path: str, out_mt_path: str):
         ),
     )
 
-    def _genotype_filter_samples(fn):
+    def _genotype_filter_samples(fn) -> hl.set:
         # Filter on the genotypes.
         return hl.set(mt.genotypes.filter(fn).map(lambda g: g.sample_id))
 
     # top level - decorator
-    def _capture_i_decorator(func):
+    def _capture_i_decorator(func):  # noqa: ANN202
         # call the returned_function(i) which locks in the value of i
-        def _inner_filter(i):
+        def _inner_filter(i):  # noqa: ANN202
             # the _genotype_filter_samples will call this _func with g
-            def _func(g):
+            def _func(g):  # noqa: ANN202
                 return func(i, g)
 
             return _func
@@ -101,15 +102,15 @@ def annotate_dataset(mt_path: str, out_mt_path: str):
         return _inner_filter
 
     @_capture_i_decorator
-    def _filter_num_alt(i, g):
+    def _filter_num_alt(i, g) -> hl.bool:
         return i == g.num_alt
 
     @_capture_i_decorator
-    def _filter_samples_gq(i, g):
+    def _filter_samples_gq(i, g) -> hl.bool:
         return (g.gq >= i) & (g.gq < i + 10)
 
     @_capture_i_decorator
-    def _filter_sample_cn(i, g):
+    def _filter_sample_cn(i, g) -> hl.bool:
         return g.cn == i
 
     # github.com/populationgenomics/seqr-loading-pipelines/blob/master/luigi_pipeline/lib/model/sv_mt_schema.py#L221

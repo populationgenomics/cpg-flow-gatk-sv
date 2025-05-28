@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
-from cpg_utils import hail_batch, config
 from cpg_flow import targets
+from cpg_utils import config, hail_batch
 
 if TYPE_CHECKING:
     from hailtop.batch.job import BashJob
@@ -44,12 +44,12 @@ def create_split_vcf_by_dataset_job(
     )
 
     job.command(
-        """
+        f"""
         bcftools view \\
             --force-samples \\
             -S {local_sgids} \\
             -Oz \\
-            -o {job.output["vcf.bgz"]} \\
+            -o {job.output['vcf.bgz']} \\
             --W=tbi \\
             {local_vcf}
         """,

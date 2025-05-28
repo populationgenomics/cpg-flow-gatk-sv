@@ -4,19 +4,19 @@ Hail Query functions for seqr loader; SV edition.
 
 import argparse
 import gzip
+
 import loguru
 
 import hail as hl
 
 from cpg_utils import config, hail_batch
 
-
 # I'm just going to go ahead and steal these constants from their seqr loader
 BOTHSIDES_SUPPORT = 'BOTHSIDES_SUPPORT'
 GENE_SYMBOL = 'gene_symbol'
 GENE_ID = 'gene_id'
 MAJOR_CONSEQUENCE = 'major_consequence'
-PASS = 'PASS'
+PASS = 'PASS'  # noqa: S105
 
 # Used to filter mt.info fields.
 CONSEQ_PREDICTED_PREFIX = 'PREDICTED_'
@@ -89,13 +89,15 @@ def parse_gtf_from_local(gtf_path: str) -> hl.dict:
     with gzip.open(gtf_path, 'rt') as gencode_file:
         # iterate over this file and do all the things
         for i, line in enumerate(gencode_file):
-            line = line.rstrip('\r\n')
-            if not line or line.startswith('#'):
+            tidy_line = line.rstrip('\r\n')
+
+            if not tidy_line or tidy_line.startswith('#'):
                 continue
-            fields = line.split('\t')
+
+            fields = tidy_line.split('\t')
             if len(fields) != len(GENCODE_FILE_HEADER):
                 raise ValueError(f'Unexpected number of fields on line #{i}: {fields}')
-            record = dict(zip(GENCODE_FILE_HEADER, fields))
+            record = dict(zip(GENCODE_FILE_HEADER, fields, strict=False))
             if record['feature_type'] != 'gene':
                 continue
             # parse info field

@@ -1,12 +1,11 @@
-from typing import TYPE_CHECKING
-
 import functools
+from typing import TYPE_CHECKING
 
 import loguru
 from google.api_core import exceptions
 
-from cpg_utils import cloud, hail_batch, config, Path
 from cpg_flow import targets
+from cpg_utils import Path, cloud, config, hail_batch
 
 if TYPE_CHECKING:
     from hailtop.batch.job import BashJob

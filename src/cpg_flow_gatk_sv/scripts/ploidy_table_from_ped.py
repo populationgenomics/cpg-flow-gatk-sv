@@ -36,11 +36,11 @@ def convert_ped_record(ped_record: str, contigs: list[str], chr_x: str = 'chrX',
     return '\t'.join([sample] + [str(ploidy[c]) for c in contigs])
 
 
-def generate_ploidy_table(ped: str, contigs: str, output: str):
+def generate_ploidy_table(ped_file: str, contigs: str, output: str):
     """
     Creates a ploidy file from a PED file
     Args:
-        ped (str): path to the PED file for this cohort
+        ped_file (str): path to the PED file for this cohort
         contigs (str): path to a file containing the contigs
         output (str): path to write the output pploidy table
 
@@ -53,11 +53,11 @@ def generate_ploidy_table(ped: str, contigs: str, output: str):
         contig_strings = [line.strip().split('\t')[0] for line in f]
 
     # start the collection of output lines
-    output_lines = ['\t'.join(['SAMPLE'] + contig_strings) + '\n']
+    output_lines = ['\t'.join(['SAMPLE', *contig_strings]) + '\n']
 
     # read the PED file
-    with to_path(ped).open('r') as ped:
-        for line in ped:
+    with to_path(ped_file).open('r') as ped_content:
+        for line in ped_content:
             if line.startswith('#'):
                 # skip comments / headers
                 continue
@@ -77,4 +77,4 @@ if __name__ == '__main__':
     parser.add_argument('--output', help='Path to write the output ploidy table')
     args = parser.parse_args()
 
-    generate_ploidy_table(ped=args.ped, contigs=args.contigs, output=args.output)
+    generate_ploidy_table(ped_file=args.ped, contigs=args.contigs, output=args.output)

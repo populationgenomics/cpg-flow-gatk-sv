@@ -14,23 +14,23 @@ from cpg_flow_gatk_sv.jobs import (
     AnnotateVcf,
     AnnotateWithStrvctvre,
     ClusterBatch,
-    FilterBatch,
-    GatherBatchEvidence,
-    GenerateBatchMetrics,
-    TrainGCNV,
-    MergeBatchSites,
     CombineExclusionLists,
-    GenotypeBatch,
-    MakeCohortVcf,
-    FormatVcfForGatk,
-    JoinRawCalls,
-    SVConcordance,
-    GeneratePloidyTable,
+    FilterBatch,
     FilterGenotypes,
     FilterWham,
-    SpiceUpSvIds,
+    FormatVcfForGatk,
+    GatherBatchEvidence,
+    GenerateBatchMetrics,
+    GeneratePloidyTable,
+    GenotypeBatch,
+    JoinRawCalls,
+    MakeCohortVcf,
+    MergeBatchSites,
     MtToEs,
+    SpiceUpSvIds,
     SplitAnnotatedSvVcf,
+    SVConcordance,
+    TrainGCNV,
 )
 from cpg_utils import Path, config
 
@@ -872,7 +872,7 @@ class AnnotateDatasetStage(stage.DatasetStage):
     required_stages=[AnnotateDatasetStage],
     analysis_type='es-index',
     analysis_keys=['index_name'],
-    update_analysis_meta=lambda x: {'seqr-dataset-type': 'SV'},
+    update_analysis_meta=lambda x: {'seqr-dataset-type': 'SV'},  # noqa: ARG005
 )
 class MtToEsStage(stage.DatasetStage):
     """

@@ -35,8 +35,8 @@ def rename_sv_ids(input_tmp: str, output_file: str, skip_prior_names: bool = Fal
             # split on tabs
             l_split = line.split('\t')
 
-            # some entries are not key-value, so skip them
-            # e.g. AN_Orig=61;END=56855888;SVTYPE=DUP;BOTHSIDES_SUPPORT;TRUTH_VID=CNV_1-46855888-56855888
+            # some entries are not key-value, so skip them, e.g.
+            # AN_Orig=61;END=56855888;SVTYPE=DUP;BOTHSIDES_SUPPORT;TRUTH_VID=CNV_1-46855888-56855888  # noqa: ERA001
             info_dict: dict[str, str] = {}
             for entry in l_split[7].split(';'):
                 if '=' in entry:

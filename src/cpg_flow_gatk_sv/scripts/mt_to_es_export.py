@@ -7,18 +7,17 @@ https://github.com/broadinstitute/seqr-loading-pipelines/blob/c113106204165e22b7
 """
 
 import math
+import sys
 import time
 from argparse import ArgumentParser
 from io import StringIO
-from sys import exit
 
 import elasticsearch
 import loguru
 
 import hail as hl
 
-from cpg_utils import to_path, config, cloud
-
+from cpg_utils import cloud, config, to_path
 
 # stolen from https://github.com/broadinstitute/seqr-loading-pipelines/blob/c113106204165e22b7a8c629054e94533615e7d2
 # ...hail_scripts/elasticsearch/elasticsearch_utils.py#L13
@@ -57,17 +56,17 @@ LOADING_NODES_NAME = 'elasticsearch-es-data-loading*'
 
 # https://hail.is/docs/devel/types.html
 # https://www.elastic.co/guide/en/elasticsearch/reference/current/mapping-types.html
-def _elasticsearch_mapping_for_type(dtype):
+def _elasticsearch_mapping_for_type(dtype) -> dict | None:
     """
     https://github.com/broadinstitute/seqr-loading-pipelines/blob/c113106204165e22b7a8c629054e94533615e7d2
     ...hail_scripts/elasticsearch/elasticsearch_utils.py#L53
     """
     if isinstance(dtype, hl.tstruct):
         return {'properties': {field: _elasticsearch_mapping_for_type(dtype[field]) for field in dtype.fields}}
-    if isinstance(dtype, (hl.tarray, hl.tset)):
+    if isinstance(dtype, hl.tarray | hl.tset):
         element_mapping = _elasticsearch_mapping_for_type(dtype.element_type)
         if isinstance(dtype.element_type, hl.tstruct):
-            element_mapping['type'] = 'nested'
+            element_mapping['type'] = 'nested'  # type: ignore[index]
         return element_mapping
     if isinstance(dtype, hl.tlocus):
         return {'type': 'object', 'properties': {'contig': {'type': 'keyword'}, 'position': {'type': 'integer'}}}
@@ -89,7 +88,7 @@ def encode_field_name(s):
     https://discuss.elastic.co/t/illegal-characters-in-elasticsearch-field-names/17196/2
     """
     field_name = StringIO()
-    for i, c in enumerate(s):
+    for c in s:
         if c == ES_FIELD_NAME_ESCAPE_CHAR:
             field_name.write(2 * ES_FIELD_NAME_ESCAPE_CHAR)
         elif c in ES_FIELD_NAME_SPECIAL_CHAR_MAP:
@@ -102,8 +101,7 @@ def encode_field_name(s):
     # escape 1st char if necessary
     if any(field_name.startswith(c) for c in ES_FIELD_NAME_BAD_LEADING_CHARS):
         return ES_FIELD_NAME_ESCAPE_CHAR + field_name
-    else:
-        return field_name
+    return field_name
 
 
 def struct_to_dict(struct):
@@ -144,10 +142,10 @@ class ElasticsearchClient:
         https://github.com/broadinstitute/seqr-loading-pipelines/blob/c113106204165e22b7a8c629054e94533615e7d2
         ...hail_scripts/elasticsearch/elasticsearch_client_v7.py#L134
         """
-        for i in range(num_attempts):
+        for _i in range(num_attempts):
             shards = self.es.cat.shards(index=index_name)
             if LOADING_NODES_NAME not in shards:
-                loguru.logger.warning('Shards are on {}'.format(shards))
+                loguru.logger.warning(f'Shards are on {shards}')
                 return
             loguru.logger.warning(
                 'Waiting for {} shards to transfer off the es-data-loading nodes: \n{}'.format(
@@ -193,31 +191,21 @@ class ElasticsearchClient:
             }
 
             loguru.logger.info(f'create_mapping - elasticsearch schema: \n{elasticsearch_schema}')
-            loguru.logger.info('==> creating elasticsearch index {}'.format(index_name))
+            loguru.logger.info(f'==> creating elasticsearch index {index_name}')
 
             self.es.indices.create(index=index_name, body=body)
 
-    def export_table_to_elasticsearch(self, table, **kwargs):
-        es_config = kwargs.get('elasticsearch_config', {})
+    def export_table_to_elasticsearch(self, table, index_name, num_shards):
         # to remove the write-null-values behaviour, remove the es.spark.dataframe.write.null entry
-        es_config.update(
-            {
-                'es.net.ssl': 'true',
-                'es.nodes.wan.only': 'true',
-                'es.net.http.auth.user': self._es_username,
-                'es.net.http.auth.pass': self._es_password,
-                # investigate whether we lose anything from always writing Nulls
-                # this is used in seqr-loading-pipelines, but not writing these would
-                # result in a much smaller index
-                'es.spark.dataframe.write.null': 'true',
-                # We are not explicitly indexing the ES Index on varianId at this time
-                # we should probably investigate this in future, but if we index on variantId
-                # we run into the possibility that gCNV (currently multiple separate indices)
-                # could have an ID clash, so the variant rows could overwrite each other
-                # 'es.mapping.id': 'variantId'  # uncomment to explicitly index rows on the UID
-            },
-        )
-        es_config['es.write.operation'] = 'index'
+        es_config = {
+            'es.net.ssl': 'true',
+            'es.nodes.wan.only': 'true',
+            'es.net.http.auth.user': self._es_username,
+            'es.net.http.auth.pass': self._es_password,
+            'es.spark.dataframe.write.null': 'true',
+            'es.write.operation': 'index',
+        }
+
         # encode any special chars in column names
         rename_dict = {}
         for field_name in table.row_value.dtype.fields:
@@ -240,15 +228,12 @@ class ElasticsearchClient:
         # create elasticsearch index with fields that match the ones in the table
         elasticsearch_schema = _elasticsearch_mapping_for_type(table.key_by().row_value.dtype)['properties']
 
-        index_name = kwargs['index_name']
-        assert index_name
-
         if self.es.indices.exists(index=index_name):
             self.es.indices.delete(index=index_name)
 
         _meta = struct_to_dict(hl.eval(table.globals))
 
-        self.create_mapping(index_name, elasticsearch_schema, num_shards=kwargs['num_shards'], _meta=_meta)
+        self.create_mapping(index_name, elasticsearch_schema, num_shards=num_shards, _meta=_meta)
 
         hl.export_elasticsearch(table, self._host, int(self._port), index_name, '', 5000, es_config)
         self.es.indices.forcemerge(index=index_name, request_timeout=60)
@@ -270,7 +255,7 @@ def main():
     # no password, but we fail gracefully
     if password is None:
         loguru.logger.warning(f'No permission to access ES password, skipping creation of {args.index}')
-        exit(0)
+        sys.exit(0)
 
     host = config.config_retrieve(['elasticsearch', 'host'])
     port = config.config_retrieve(['elasticsearch', 'port'])
@@ -301,7 +286,7 @@ def main():
     if es_client.es.indices.exists(index=args.index):
         es_client.es.indices.delete(index=args.index)
 
-    es_client.export_table_to_elasticsearch(row_ht, index_name=args.index, num_shards=es_shards)
+    es_client.export_table_to_elasticsearch(table=row_ht, index_name=args.index, num_shards=es_shards)
 
     # https://github.com/broadinstitute/seqr-loading-pipelines/blob/c113106204165e22b7a8c629054e94533615e7d2
     # ...luigi_pipeline/lib/hail_tasks.py#L266
