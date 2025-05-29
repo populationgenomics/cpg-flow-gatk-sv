@@ -7,9 +7,6 @@ min_batch_size = 10
 
 sequencing_type = 'genome'
 
-# some genomes copied from Main which had succeeded through calling, to be used in test runs
-input_cohorts = ['COH5376']
-
 ref_fasta = 'gs://cpg-common-main/references/hg38/v0/dragen_reference/Homo_sapiens_assembly38_masked.fasta'
 
 status_reporter = 'metamist'

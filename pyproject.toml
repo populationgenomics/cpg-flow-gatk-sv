@@ -40,11 +40,14 @@ test = [
 [project.scripts]
 
 # the workflow runner scripts - entrypoints for the different pipelines
-first_workflow = 'cpg_flow_gatk_sv.first_workflow:cli_main'
-second_workflow = 'cpg_flow_gatk_sv.second_workflow:cli_main'
+singlesample_workflow = 'cpg_flow_gatk_sv.singlesample_workflow:cli_main'
+multisample_workflow = 'cpg_flow_gatk_sv.multisample_workflow:cli_main'
 
-[tool.setuptools]
-package-dir = {"" = "src"}
+[tool.hatch.build.targets.wheel]
+packages = ["src/cpg_flow_gatk_sv"]
+
+[tool.hatch.build.targets.wheel.sources]
+"src" = ""
 
 [options]
 include_package_data = true
@@ -113,8 +116,8 @@ cpg = ["metamist", "cpg_flow", "cpg_utils", "cpg_flow_gatk_sv"]
 hail = ["hail"]
 
 [tool.ruff.lint.per-file-ignores]
-"src/cpg_flow_gatk_sv/first_workflow.py" = ["ARG002"]
-"src/cpg_flow_gatk_sv/second_workflow.py" = ["ARG002"]
+"src/cpg_flow_gatk_sv/singlesample_workflow.py" = ["ARG002"]
+"src/cpg_flow_gatk_sv/multisample_workflow.py" = ["ARG002"]
 
 [tool.bumpversion]
 current_version = "0.1.1"
