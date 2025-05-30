@@ -4,8 +4,7 @@ from typing import TYPE_CHECKING
 
 from cpg_flow import targets
 from cpg_flow_gatk_sv import utils
-from cpg_utils import Path
-from cpg_utils.config import AR_GUID_NAME, try_get_ar_guid
+from cpg_utils import Path, config
 
 if TYPE_CHECKING:
     from hailtop.batch.job import BashJob
@@ -39,9 +38,15 @@ def create_evidence_qc_jobs(
     for caller in utils.SV_CALLERS:
         cromwell_input_dict[f'{caller}_vcfs'] = [str(input_dict[sid][f'{caller}_vcf']) for sid in sgids]
 
-    cromwell_input_dict |= utils.get_images(
-        ['sv_base_mini_docker', 'sv_base_docker', 'sv_pipeline_docker', 'sv_pipeline_qc_docker'],
-    )
+    cromwell_input_dict |= {
+        key: config.config_retrieve(['images', key])
+        for key in [
+            'sv_base_mini_docker',
+            'sv_base_docker',
+            'sv_pipeline_docker',
+            'sv_pipeline_qc_docker',
+        ]
+    }
 
     cromwell_input_dict |= utils.get_references(['genome_file', 'wgd_scoring_mask'])
 
@@ -51,6 +56,6 @@ def create_evidence_qc_jobs(
         wfl_name='EvidenceQC',
         input_dict=cromwell_input_dict,
         expected_out_dict=output_dict,
-        labels={'stage': 'evidenceqc', AR_GUID_NAME: try_get_ar_guid()},
+        labels={'stage': 'evidenceqc', config.AR_GUID_NAME: config.try_get_ar_guid()},
         job_size=utils.CromwellJobSizes.MEDIUM,
     )

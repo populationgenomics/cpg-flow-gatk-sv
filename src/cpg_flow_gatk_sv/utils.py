@@ -2,7 +2,10 @@
 Common methods for all GATK-SV workflows
 """
 
+import functools
+import itertools
 import re
+from collections import defaultdict
 from enum import Enum
 from functools import cache
 from os.path import join
@@ -11,8 +14,9 @@ from typing import TYPE_CHECKING, Any
 
 import loguru
 
-from cpg_flow import targets, utils
+from cpg_flow import targets, utils, workflow
 from cpg_utils import Path, config, cromwell, hail_batch, to_path
+from metamist.graphql import gql, query
 
 if TYPE_CHECKING:
     from hailtop.batch.job import BashJob
@@ -22,6 +26,20 @@ SV_CALLERS = ['manta', 'wham', 'scramble']
 
 _FASTA_STRING = None
 PED_FAMILY_ID_REGEX = re.compile(r'(^[A-Za-z0-9_]+$)')
+
+
+VCF_QUERY = gql(
+    """
+    query MyQuery($dataset: String!) {
+        project(name: $dataset) {
+            analyses(active: {eq: true}, type: {eq: "sv"}, status: {eq: COMPLETED}) {
+                output
+                timestampCompleted
+            }
+        }
+    }
+""",
+)
 
 
 class CromwellJobSizes(Enum):
@@ -84,28 +102,6 @@ def get_fasta_string() -> Path:
     return _FASTA_STRING
 
 
-def get_images(keys: list[str], allow_missing=False) -> dict[str, str]:
-    """
-    Dict of WDL inputs with docker image paths.
-
-    Args:
-        keys (list): all the images to get
-        allow_missing (bool): if False, require all query keys to be found
-
-    Returns:
-        dict of image keys to image paths
-        or AssertionError
-    """
-    image_keys = config.config_retrieve(['images']).keys()
-
-    if not allow_missing:
-        query_keys = set(keys)
-        if not query_keys.issubset(image_keys):
-            raise KeyError(f'Unknown image keys: {query_keys - image_keys}')
-
-    return {k: config.image_path(k) for k in image_keys if k in keys}
-
-
 def get_references(keys: list[str | dict[str, str]]) -> dict[str, str | list[str]]:
     """
     Dict of WDL inputs with reference file paths.
@@ -113,14 +109,15 @@ def get_references(keys: list[str | dict[str, str]]) -> dict[str, str | list[str
     res: dict[str, str | list[str]] = {}
     for key in keys:
         # Keys can be maps (e.g. {'MakeCohortVcf.cytobands': 'cytoband'})
-        ref_d_key = next(iter(key.values())) if isinstance(key, dict) else key
+        use_key, ref_key = next(iter(key.items())) if isinstance(key, dict) else (key, key)
 
         # e.g. GATKSVPipelineBatch.rmsk -> rmsk
-        ref_d_key = ref_d_key.split('.')[-1]
+        ref_key = ref_key.split('.')[-1]
+
         try:
-            res[key] = config.reference_path(f'gatk_sv/{ref_d_key}')  # type: ignore[index]
+            res[use_key] = config.reference_path(f'gatk_sv/{ref_key}')  # type: ignore[index]
         except (KeyError, config.ConfigError):
-            res[key] = config.reference_path(f'broad/{ref_d_key}')  # type: ignore[index]
+            res[use_key] = config.reference_path(f'broad/{ref_key}')  # type: ignore[index]
 
     return res
 
@@ -212,123 +209,84 @@ def add_gatk_sv_jobs(
     return [submit_j, copy_j]
 
 
-def get_ref_panel(keys: list[str] | None = None) -> dict:
-    # mandatory config entry
-    ref_panel_samples = config.config_retrieve(['sv_ref_panel', 'ref_panel_samples'])
-    return {
-        k: v
-        for k, v in {
-            'ref_panel_samples': ref_panel_samples,
-            'ref_panel_bincov_matrix': config.reference_path('broad/ref_panel_bincov_matrix'),
-            'contig_ploidy_model_tar': config.reference_path('gatk_sv/contig_ploidy_model_tar'),
-            'gcnv_model_tars': [
-                str(config.reference_path('gatk_sv/model_tar_tmpl')).format(shard=i)
-                for i in range(config.config_retrieve(['sv_ref_panel', 'model_tar_cnt']))
-            ],
-            'ref_panel_PE_files': [
-                config.reference_path('gatk_sv/ref_panel_PE_file_tmpl').format(sample=s) for s in ref_panel_samples
-            ],
-            'ref_panel_SR_files': [
-                config.reference_path('gatk_sv/ref_panel_SR_file_tmpl').format(sample=s) for s in ref_panel_samples
-            ],
-            'ref_panel_SD_files': [
-                config.reference_path('gatk_sv/ref_panel_SD_file_tmpl').format(sample=s) for s in ref_panel_samples
-            ],
-        }.items()
-        if not keys or k in keys
-    }
-
-
-def clean_ped_family_ids(ped_line: str) -> str:
+def clean_ped_family_id(family_id: str) -> str:
     """
-    Takes each line in the pedigree and cleans it up
+    Takes a family ID from the pedigree and cleans it up
     If the family ID already conforms to expectations, no action
-    If the family ID fails, replace all non-alphanumeric/non-underscore
-    characters with underscores
+    If the family ID fails, replace all non-alphanumeric/non-underscore characters with underscores
 
-    >>> clean_ped_family_ids('family1\tchild1\t0\t0\t1\t0\\n')
-    'family1\tchild1\t0\t0\t1\t0\\n'
-    >>> clean_ped_family_ids('family-1-dirty\tchild1\t0\t0\t1\t0\\n')
-    'family_1_dirty\tchild1\t0\t0\t1\t0\\n'
+    >>> clean_ped_family_id('family1')
+    'family1'
+    >>> clean_ped_family_id('family-1-dirty')
+    'family_1_dirty'
 
     Args:
-        ped_line (str): line from the pedigree file, unsplit
+        family_id (str): line from the pedigree file, unsplit
 
     Returns:
         the same line with a transformed family id
     """
 
-    split_line = ped_line.rstrip().split('\t')
-
-    if re.match(PED_FAMILY_ID_REGEX, split_line[0]):
-        return ped_line
-
     # if the family id is not valid, replace failing characters with underscores
-    split_line[0] = re.sub(r'[^A-Za-z0-9_]', '_', split_line[0])
+    return (
+        family_id
+        if re.match(
+            PED_FAMILY_ID_REGEX,
+            family_id,
+        )
+        else re.sub(
+            r'[^A-Za-z0-9_]',
+            '_',
+            family_id,
+        )
+    )
 
-    # return the rebuilt string, with a newline at the end
-    return '\t'.join(split_line) + '\n'
 
-
-def make_combined_ped(cohort: targets.Cohort | targets.MultiCohort, prefix: Path) -> Path:
+def make_combined_ped(cohort: targets.Cohort | targets.MultiCohort, combined_ped_path: Path) -> None:
     """
     Create cohort + ref panel PED.
     Concatenating all samples across all datasets with ref panel
 
     See #578 - there are restrictions on valid characters in PED file
+
+    Args:
+        cohort ():
+        combined_ped_path ():
+
+    Returns:
+        None
     """
-    combined_ped_path = prefix / 'ped_with_ref_panel.ped'
+
+    # first get standard pedigree
+    ped_dicts = [sequencing_group.pedigree.get_ped_dict() for sequencing_group in cohort.get_sequencing_groups()]
+
+    if not ped_dicts:
+        raise ValueError(f'No pedigree data found for {cohort.id}')
+
     conf_ped_path = get_references(['ped_file'])['ped_file']
-    with combined_ped_path.open('w') as out:
-        with cohort.write_ped_file().open() as f:
-            # layer of family ID cleaning
-            for line in f:
-                out.write(clean_ped_family_ids(line))
+
+    with (
+        combined_ped_path.open('w') as out,
+        to_path(conf_ped_path).open() as ref_ped,
+    ):
+        # layer of family ID cleaning
+        for ped_dict in ped_dicts:
+            out.write(
+                '\t'.join(
+                    [
+                        clean_ped_family_id(ped_dict['Family.ID']),
+                        ped_dict['Individual.ID'],
+                        ped_dict['Father.ID'],
+                        ped_dict['Mother.ID'],
+                        ped_dict['Sex'],
+                        ped_dict['Phenotype'],
+                    ]
+                )
+                + '\n'
+            )
+
         # The ref panel PED doesn't have any header, so can safely concatenate:
-        with to_path(conf_ped_path).open() as f:
-            out.write(f.read())
-    return combined_ped_path
-
-
-def queue_annotate_sv_jobs(
-    multicohort: targets.MultiCohort,
-    prefix: Path,
-    input_vcf: Path,
-    outputs: dict,
-    labels: dict[str, str] | None = None,
-) -> list['BashJob']:
-    """
-    Helper function to queue jobs for SV annotation
-    Enables common access to the same Annotation WDL for CNV & SV
-    """
-    input_dict: dict[str, Any] = {
-        'vcf': input_vcf,
-        'prefix': multicohort.name,
-        'ped_file': make_combined_ped(multicohort, prefix),
-        'sv_per_shard': 5000,
-        'external_af_population': config.config_retrieve(['references', 'gatk_sv', 'external_af_population']),
-        'external_af_ref_prefix': config.config_retrieve(['references', 'gatk_sv', 'external_af_ref_bed_prefix']),
-        'external_af_ref_bed': config.config_retrieve(['references', 'gnomad_sv']),
-        'use_hail': False,
-    }
-
-    input_dict |= get_references(
-        [
-            'noncoding_bed',
-            'protein_coding_gtf',
-            {'contig_list': 'primary_contigs_list'},
-        ],
-    )
-
-    # images!
-    input_dict |= get_images(['sv_pipeline_docker', 'sv_base_mini_docker', 'gatk_docker'])
-    return add_gatk_sv_jobs(
-        dataset=multicohort.analysis_dataset,
-        wfl_name='AnnotateVcf',
-        input_dict=input_dict,
-        expected_out_dict=outputs,
-        labels=labels,
-    )
+        out.write(ref_ped.read())
 
 
 def queue_annotate_strvctvre_job(
@@ -370,3 +328,111 @@ def queue_annotate_strvctvre_job(
 
     hail_batch.get_batch().write_output(strv_job.output, str(output_path).replace('.vcf.gz', ''))
     return strv_job
+
+
+def check_for_cohort_overlaps(multicohort: targets.MultiCohort):
+    """
+    Check for overlapping cohorts in a MultiCohort.
+    GATK-SV does not tolerate overlapping cohorts, so we check for this here.
+    This is called once per MultiCohort, and raises an Exception if any overlaps are found
+
+    Args:
+        multicohort (MultiCohort): the MultiCohort to check
+    """
+    # placeholder for errors
+    errors: list[str] = []
+    sgs_per_cohort: dict[str, set[str]] = {}
+    # grab all SG IDs per cohort
+    for cohort in multicohort.get_cohorts():
+        # shouldn't be possible, but guard against to be sure
+        if cohort.id in sgs_per_cohort:
+            raise ValueError(f'Cohort {cohort.id} already exists in {sgs_per_cohort}')
+
+        # collect the SG IDs for this cohort
+        sgs_per_cohort[cohort.id] = set(cohort.get_sequencing_group_ids())
+
+    # pairwise iteration over cohort IDs
+    for id1, id2 in itertools.combinations(sgs_per_cohort, 2):
+        # if the IDs are the same, skip. Again, shouldn't be possible, but guard against to be sure
+        if id1 == id2:
+            continue
+        # if there are overlapping SGs, raise an error
+        if overlap := sgs_per_cohort[id1] & sgs_per_cohort[id2]:
+            errors.append(f'Overlapping cohorts {id1} and {id2} have overlapping SGs: {overlap}')
+    # upon findings any errors, raise an Exception and die
+    if errors:
+        raise ValueError('\n'.join(errors))
+
+
+def check_paths_exist(input_dict: dict[str, Any]):
+    """
+    Check that all paths in the input_dict exist
+    """
+    invalid_paths = defaultdict(list)
+    for k in ['counts', 'PE_files', 'SD_files', 'SR_files'] + [f'{caller}_vcfs' for caller in SV_CALLERS]:
+        for str_path in input_dict[k]:
+            path = to_path(str_path)
+            if not path.exists():
+                sg_id = path.name.split('/')[-1].split('.')[0]
+                invalid_paths[sg_id].append(str_path)
+    if invalid_paths:
+        error_str = '\n'.join([f'{k}: {", ".join(v)}' for k, v in invalid_paths.items()])
+        raise FileNotFoundError(f'The following paths do not exist:\n{error_str}')
+
+
+@cache
+def query_for_spicy_vcf(dataset: str) -> str | None:
+    """
+    query for the most recent previous SpiceUpSVIDs VCF
+    the SpiceUpSVIDs Stage involves overwriting the generic sequential variant IDs
+    with meaningful Identifiers, so we can track the same variant across different callsets
+
+    Args:
+        dataset (str): project to query for
+
+    Returns:
+        str, the path to the latest Spicy VCF
+        or None, if there are no Spicy VCFs
+    """
+
+    # hot swapping to a string we can freely modify
+    query_dataset = dataset
+
+    if config.config_retrieve(['workflow', 'access_level']) == 'test' and 'test' not in query_dataset:
+        query_dataset += '-test'
+
+    result = query(VCF_QUERY, variables={'dataset': query_dataset})
+    spice_by_date: dict[str, str] = {}
+    for analysis in result['project']['analyses']:
+        if analysis['output'] and analysis['output'].endswith('fresh_ids.vcf.bgz'):
+            spice_by_date[analysis['timestampCompleted']] = analysis['output']
+
+    if not spice_by_date:
+        return None
+
+    # return the latest, determined by a sort on timestamp
+    # 2023-10-10... > 2023-10-09..., so sort on strings
+    return spice_by_date[sorted(spice_by_date)[-1]]
+
+
+@functools.cache
+def write_dataset_sg_ids(dataset: targets.Dataset) -> Path:
+    """
+    For a given dataset, write all its SGs to a file.
+    Make this path specific to the dataset and run, so we can use it in multiple jobs
+
+    Args:
+        dataset ():
+
+    Returns:
+
+    """
+    sgids_list_path = dataset.tmp_prefix() / workflow.get_workflow().output_version / 'sv-sgid-list.txt'
+    if config.config_retrieve(['workflow', 'dry_run'], False):
+        return sgids_list_path
+
+    with sgids_list_path.open('w') as f:
+        for sgid in dataset.get_sequencing_group_ids():
+            f.write(f'{sgid}\n')
+
+    return sgids_list_path
