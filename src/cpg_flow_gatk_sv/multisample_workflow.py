@@ -80,7 +80,7 @@ class TrainGcnvStage(stage.CohortStage):
             / 'cohort_contig_ploidy_calls.tar.gz',
             'cohort_gcnv_model_tars': [
                 self.get_stage_cohort_prefix(cohort) / f'cohort_gcnv_model_{idx}.tar.gz'
-                for idx in range(config.config_retrieve(['workflow', 'model_tar_cnt']))
+                for idx in range(config.config_retrieve(['workflow', 'model_tar_count']))
             ],
         }
 
