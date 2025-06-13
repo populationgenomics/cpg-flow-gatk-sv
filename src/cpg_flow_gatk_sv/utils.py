@@ -21,7 +21,7 @@ from metamist.graphql import gql, query
 if TYPE_CHECKING:
     from hailtop.batch.job import BashJob
 
-GATK_SV_COMMIT = 'dc145a52f76a6f425ac3f481171040e78c0cfeea'
+GATK_SV_COMMIT = config.config_retrieve(['workflow', 'gatk_sv_commit'])
 SV_CALLERS = ['manta', 'wham', 'scramble']
 
 _FASTA_STRING = None

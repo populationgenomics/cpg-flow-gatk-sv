@@ -1,6 +1,8 @@
 [workflow]
 name = 'gatk_sv'
 
+gatk_sv_commit = 'dc145a52f76a6f425ac3f481171040e78c0cfeea'
+
 check_expected_outputs = true
 
 min_batch_size = 10
