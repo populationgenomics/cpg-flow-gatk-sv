@@ -52,13 +52,21 @@ def add_train_gcnv_jobs(cohort: targets.Cohort, output_dict: dict[str, Path]):
         ]
     }
 
+    # break the output dict into the individual Path components, and the components that need to be in a list
+    # this overcomes the limitations of `expected_outputs`, whilst transmitting a dictionary: list: Path structure
+    output_tar_list = [
+        output_dict[f'each_tar_{idx}'] for idx in range(config.config_retrieve(['workflow', 'model_tar_count']))
+    ]
+    clean_outputs = {key: value for key, value in output_dict.items() if not key.startswith('each_tar_')}
+    clean_outputs |= {'cohort_gcnv_model_tars': output_tar_list}
+
     # billing labels must conform to the regex [a-z]([-a-z0-9]*[a-z0-9])?
     # https://cromwell.readthedocs.io/en/stable/wf_options/Google/
     return utils.add_gatk_sv_jobs(
         dataset=cohort.dataset,
         wfl_name='TrainGCNV',
         input_dict=cromwell_input_dict,
-        expected_out_dict=output_dict,
+        expected_out_dict=clean_outputs,
         labels={'stage': 'traingcnv', config.AR_GUID_NAME: config.try_get_ar_guid()},
         job_size=utils.CromwellJobSizes.MEDIUM,
     )

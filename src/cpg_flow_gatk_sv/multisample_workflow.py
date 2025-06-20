@@ -73,16 +73,22 @@ class TrainGcnvStage(stage.CohortStage):
     """
 
     def expected_outputs(self, cohort: targets.Cohort) -> dict[str, Path]:
-        return {
+        """
+        This is slightly janky, but expected_outputs only tolerates a Path, or dict of Paths. A dict: list: Paths is
+        not compliant. To overcome we need to return a dict of Paths, then extract some of the paths into a list later.
+        """
+        outputs = {
             'cohort_contig_ploidy_model_tar': self.get_stage_cohort_prefix(cohort)
             / 'cohort_contig_ploidy_model.tar.gz',
             'cohort_contig_ploidy_calls_tar': self.get_stage_cohort_prefix(cohort)
             / 'cohort_contig_ploidy_calls.tar.gz',
-            'cohort_gcnv_model_tars': [
-                self.get_stage_cohort_prefix(cohort) / f'cohort_gcnv_model_{idx}.tar.gz'
-                for idx in range(config.config_retrieve(['workflow', 'model_tar_count']))
-            ],
         }
+        outputs |= {
+            f'each_tar_{idx}': self.get_stage_cohort_prefix(cohort) / f'cohort_gcnv_model_{idx}.tar.gz'
+            for idx in range(config.config_retrieve(['workflow', 'model_tar_count']))
+        }
+
+        return outputs
 
     def queue_jobs(self, cohort: targets.Cohort, inputs: stage.StageInput) -> stage.StageOutput:
         outputs = self.expected_outputs(cohort)
@@ -273,6 +279,7 @@ class FilterBatchStage(stage.CohortStage):
         ]
 
         d = {}
+        # TODO a similar change here
         for key, ending in ending_by_key.items():
             if isinstance(ending, str):
                 d[key] = self.get_stage_cohort_prefix(cohort) / ending
