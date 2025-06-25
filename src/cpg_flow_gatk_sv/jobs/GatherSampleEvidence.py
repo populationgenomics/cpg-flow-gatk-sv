@@ -78,6 +78,11 @@ def create_gather_sample_evidence_jobs(
                 caller = key.removesuffix('_docker')
                 input_dict[key] = val if caller in only_jobs else None
 
+        if 'scramble' in only_jobs and 'manta' not in only_jobs:
+            # if Scramble is being run, but Manta is not, manta_vcf and index becomes a required input
+            input_dict['manta_vcf'] = expected_outputs['manta_vcf']
+            input_dict['manta_index'] = expected_outputs['manta_index']
+
     # billing labels!
     # https://cromwell.readthedocs.io/en/stable/wf_options/Google/
     # these must conform to the regex [a-z]([-a-z0-9]*[a-z0-9])?
