@@ -75,8 +75,9 @@ def create_gather_sample_evidence_jobs(
         if 'scramble' in only_jobs and 'manta' not in only_jobs:
             # if Scramble is being run, but Manta is not, manta_vcf and index becomes a required input
             if to_path(expected_outputs['manta_vcf']).exists():
-                input_dict['manta_vcf_input'] = expected_outputs['manta_vcf']
-                input_dict['manta_index_index_input'] = expected_outputs['manta_index']
+                # if the Manta VCF exists, use it as input and remove it from expected outputs
+                input_dict['manta_vcf_input'] = expected_outputs.pop('manta_vcf')
+                input_dict['manta_index_index_input'] = expected_outputs.pop('manta_index')
             else:
                 raise ValueError(
                     f'Scramble is being run, but Manta VCF was not found at {expected_outputs["manta_vcf"]}.'
