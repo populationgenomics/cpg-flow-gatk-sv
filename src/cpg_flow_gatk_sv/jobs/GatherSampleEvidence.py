@@ -72,16 +72,22 @@ def create_gather_sample_evidence_jobs(
         if 'pesr' not in only_jobs:
             input_dict['collect_pesr'] = False
 
+        if 'scramble' in only_jobs and 'manta' not in only_jobs:
+            # if Scramble is being run, but Manta is not, manta_vcf and index becomes a required input
+            if to_path(expected_outputs['manta_vcf']).exists():
+                input_dict['manta_vcf'] = expected_outputs['manta_vcf']
+                input_dict['manta_index'] = expected_outputs['manta_index']
+            else:
+                raise ValueError(
+                    f'Scramble is being run, but Manta VCF was not found at {expected_outputs["manta_vcf"]}.'
+                    'Include manta in only_jobs or make sure the VCF exists at the path.',
+                )
+
         # disable the caller jobs that are not in only_jobs by nulling their docker image
         for key, val in input_dict.items():
             if key in [f'{caller}_docker' for caller in utils.SV_CALLERS]:
                 caller = key.removesuffix('_docker')
                 input_dict[key] = val if caller in only_jobs else None
-
-        if 'scramble' in only_jobs and 'manta' not in only_jobs:
-            # if Scramble is being run, but Manta is not, manta_vcf and index becomes a required input
-            input_dict['manta_vcf'] = expected_outputs['manta_vcf']
-            input_dict['manta_index'] = expected_outputs['manta_index']
 
     # billing labels!
     # https://cromwell.readthedocs.io/en/stable/wf_options/Google/
