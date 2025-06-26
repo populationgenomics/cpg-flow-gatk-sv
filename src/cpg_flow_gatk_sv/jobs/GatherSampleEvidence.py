@@ -80,7 +80,7 @@ def create_gather_sample_evidence_jobs(
                 # if the Manta VCF exists, use it as input and remove it from expected outputs
                 loguru.logger.info(f'Re-using existing Manta VCF {expected_outputs["manta_vcf"]} for {sg.id}')
                 input_dict['manta_vcf_input'] = expected_outputs.pop('manta_vcf')
-                input_dict['manta_index_index_input'] = expected_outputs.pop('manta_index')
+                input_dict['manta_vcf_index_input'] = expected_outputs.pop('manta_index')
             else:
                 # if the Manta VCF does not exist, run Manta as well
                 loguru.logger.info(
