@@ -79,10 +79,8 @@ def create_gather_sample_evidence_jobs(
                 input_dict['manta_vcf_input'] = expected_outputs.pop('manta_vcf')
                 input_dict['manta_index_index_input'] = expected_outputs.pop('manta_index')
             else:
-                raise ValueError(
-                    f'Scramble is being run, but Manta VCF was not found at {expected_outputs["manta_vcf"]}.'
-                    'Include manta in only_jobs or make sure the VCF exists at the path.',
-                )
+                # if the Manta VCF does not exist, run Manta as well
+                only_jobs.append('manta')
 
         # disable the caller jobs that are not in only_jobs by nulling their docker image
         for key, val in input_dict.items():
