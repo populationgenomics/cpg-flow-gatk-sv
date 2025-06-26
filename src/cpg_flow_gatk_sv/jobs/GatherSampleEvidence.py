@@ -72,6 +72,16 @@ def create_gather_sample_evidence_jobs(
         if 'pesr' not in only_jobs:
             input_dict['collect_pesr'] = False
 
+        if 'scramble' in only_jobs and 'manta' not in only_jobs:
+            # if Scramble is being run, but Manta is not, manta_vcf and index becomes a required input
+            if to_path(expected_outputs['manta_vcf']).exists():
+                # if the Manta VCF exists, use it as input and remove it from expected outputs
+                input_dict['manta_vcf_input'] = expected_outputs.pop('manta_vcf')
+                input_dict['manta_index_index_input'] = expected_outputs.pop('manta_index')
+            else:
+                # if the Manta VCF does not exist, run Manta as well
+                only_jobs.append('manta')
+
         # disable the caller jobs that are not in only_jobs by nulling their docker image
         for key, val in input_dict.items():
             if key in [f'{caller}_docker' for caller in utils.SV_CALLERS]:

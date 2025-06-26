@@ -54,9 +54,10 @@ class GatherSampleEvidenceStage(stage.SequencingGroupStage):
             outputs[f'{caller}_vcf'] = prefix / f'{sequencing_group.id}.{caller}.vcf.gz'
             outputs[f'{caller}_index'] = prefix / f'{sequencing_group.id}.{caller}.vcf.gz.tbi'
 
-        # TODO This selection process may need to adapt to a new condition...
-        # TODO If Scramble is being run, but Manta is not, manta_vcf and index becomes a required input
         if only_jobs := config.config_retrieve(['workflow', self.name, 'only_jobs'], None):
+            # If Scramble is being run, but Manta is not, manta_vcf and index becomes a required input
+            if 'scramble' in only_jobs and 'manta' not in only_jobs:
+                only_jobs.append('manta')
             # remove the expected outputs for the jobs that are not in only_jobs
             new_expected = {}
             for job in only_jobs:
