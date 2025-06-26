@@ -52,7 +52,7 @@ class GatherSampleEvidence(stage.SequencingGroupStage):
         }
 
         # Caller's VCFs
-        for caller in utils.get_sv_callers():
+        for caller in utils.get_sv_callers(add_manta=True):
             outputs[f'{caller}_vcf'] = prefix / f'{sequencing_group.id}.{caller}.vcf.gz'
             outputs[f'{caller}_index'] = prefix / f'{sequencing_group.id}.{caller}.vcf.gz.tbi'
 

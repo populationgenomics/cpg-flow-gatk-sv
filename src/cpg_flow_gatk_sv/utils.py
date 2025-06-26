@@ -53,10 +53,10 @@ class CromwellJobSizes(Enum):
 
 
 @cache
-def get_sv_callers():
+def get_sv_callers(add_manta: bool = False):
     if only_jobs := config.config_retrieve(['workflow', 'GatherSampleEvidence', 'only_jobs'], None):
         callers = [caller for caller in SV_CALLERS if caller in only_jobs]
-        if 'scramble' in only_jobs and 'manta' not in only_jobs:
+        if 'scramble' in only_jobs and 'manta' not in only_jobs and add_manta:
             callers.append('manta')
         if not callers:
             loguru.logger.warning('No SV callers enabled')
