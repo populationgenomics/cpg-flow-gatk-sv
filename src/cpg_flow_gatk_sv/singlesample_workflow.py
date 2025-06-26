@@ -4,8 +4,6 @@ single-sample components of the GATK SV workflow
 
 import argparse
 
-import loguru
-
 from cpg_flow import stage, targets, workflow
 from cpg_flow_gatk_sv import utils
 from cpg_flow_gatk_sv.jobs.CreateSampleBatches import create_sample_batches
@@ -59,21 +57,13 @@ class GatherSampleEvidence(stage.SequencingGroupStage):
             outputs[f'{caller}_index'] = prefix / f'{sequencing_group.id}.{caller}.vcf.gz.tbi'
 
         if only_jobs := config.config_retrieve(['workflow', self.name, 'only_jobs'], None):
-            loguru.logger.info(
-                f'GatherSampleEvidence: only running jobs: {only_jobs} for {sequencing_group.id}'
-            )
-            # If Scramble is being run, but Manta is not, manta_vcf and index becomes a required input
-            if 'scramble' in only_jobs and 'manta' not in only_jobs:
-                loguru.logger.info(
-                    f'Adding Manta to only_jobs for {sequencing_group.id} because Scramble is being run'
-                )
-                only_jobs.append('manta')
             # remove the expected outputs for the jobs that are not in only_jobs
             new_expected = {}
             for job in only_jobs:
                 for key, path in outputs.items():
                     if job in key:
                         new_expected[key] = path
+
             outputs = new_expected
 
         return outputs
