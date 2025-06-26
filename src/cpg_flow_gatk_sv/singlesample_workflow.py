@@ -52,20 +52,24 @@ class GatherSampleEvidence(stage.SequencingGroupStage):
         }
 
         # Caller's VCFs
-        for caller in utils.get_sv_callers():
+        for caller in utils.get_sv_callers(add_manta=True):
             outputs[f'{caller}_vcf'] = prefix / f'{sequencing_group.id}.{caller}.vcf.gz'
             outputs[f'{caller}_index'] = prefix / f'{sequencing_group.id}.{caller}.vcf.gz.tbi'
 
         if only_jobs := config.config_retrieve(['workflow', self.name, 'only_jobs'], None):
-            # If Scramble is being run, but Manta is not, manta_vcf and index becomes a required input
-            if 'scramble' in only_jobs and 'manta' not in only_jobs:
-                only_jobs.append('manta')
             # remove the expected outputs for the jobs that are not in only_jobs
             new_expected = {}
             for job in only_jobs:
                 for key, path in outputs.items():
                     if job in key:
                         new_expected[key] = path
+
+            if 'scramble' in only_jobs and 'manta' not in only_jobs:
+                # if Scramble is being run, but Manta is not, manta_vcf and index becomes a required input
+                # so we need to add them to the expected outputs
+                new_expected['manta_vcf'] = outputs['manta_vcf']
+                new_expected['manta_index'] = outputs['manta_index']
+
             outputs = new_expected
 
         return outputs

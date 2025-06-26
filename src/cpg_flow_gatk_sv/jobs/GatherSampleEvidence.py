@@ -77,7 +77,7 @@ def create_gather_sample_evidence_jobs(
             if to_path(expected_outputs['manta_vcf']).exists():
                 # if the Manta VCF exists, use it as input and remove it from expected outputs
                 input_dict['manta_vcf_input'] = expected_outputs.pop('manta_vcf')
-                input_dict['manta_index_index_input'] = expected_outputs.pop('manta_index')
+                input_dict['manta_vcf_index_input'] = expected_outputs.pop('manta_index')
             else:
                 # if the Manta VCF does not exist, run Manta as well
                 only_jobs.append('manta')
