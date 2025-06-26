@@ -1,7 +1,5 @@
 from typing import TYPE_CHECKING, Any
 
-import loguru
-
 from cpg_flow import targets
 from cpg_flow_gatk_sv import utils
 from cpg_utils import Path, config, to_path
@@ -78,14 +76,10 @@ def create_gather_sample_evidence_jobs(
             # if Scramble is being run, but Manta is not, manta_vcf and index becomes a required input
             if to_path(expected_outputs['manta_vcf']).exists():
                 # if the Manta VCF exists, use it as input and remove it from expected outputs
-                loguru.logger.info(f'Re-using existing Manta VCF {expected_outputs["manta_vcf"]} for {sg.id}')
                 input_dict['manta_vcf_input'] = expected_outputs.pop('manta_vcf')
                 input_dict['manta_vcf_index_input'] = expected_outputs.pop('manta_index')
             else:
                 # if the Manta VCF does not exist, run Manta as well
-                loguru.logger.info(
-                    f'Adding Manta job for {sg.id} because Scramble is being run and Manta VCF does not exist'
-                )
                 only_jobs.append('manta')
 
         # disable the caller jobs that are not in only_jobs by nulling their docker image
