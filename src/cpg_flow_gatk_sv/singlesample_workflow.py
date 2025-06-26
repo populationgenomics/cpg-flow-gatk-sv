@@ -64,6 +64,12 @@ class GatherSampleEvidence(stage.SequencingGroupStage):
                     if job in key:
                         new_expected[key] = path
 
+            if 'scramble' in only_jobs and 'manta' not in only_jobs:
+                # if Scramble is being run, but Manta is not, manta_vcf and index becomes a required input
+                # so we need to add them to the expected outputs
+                new_expected['manta_vcf'] = outputs['manta_vcf']
+                new_expected['manta_index'] = outputs['manta_index']
+
             outputs = new_expected
 
         return outputs
