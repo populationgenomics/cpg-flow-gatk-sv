@@ -6,7 +6,9 @@ import argparse
 
 from cpg_flow import stage, targets, workflow
 from cpg_flow_gatk_sv import utils
-from cpg_flow_gatk_sv.jobs import CreateSampleBatches, EvidenceQC, GatherSampleEvidence
+from cpg_flow_gatk_sv.jobs.CreateSampleBatches import create_sample_batches
+from cpg_flow_gatk_sv.jobs.EvidenceQC import create_evidence_qc_jobs
+from cpg_flow_gatk_sv.jobs.GatherSampleEvidence import create_gather_sample_evidence_jobs
 from cpg_utils import Path, config
 
 
@@ -14,7 +16,7 @@ from cpg_utils import Path, config
     analysis_keys=[f'{caller}_vcf' for caller in utils.get_sv_callers()] if utils.get_sv_callers() else None,
     analysis_type='sv',
 )
-class GatherSampleEvidenceStage(stage.SequencingGroupStage):
+class GatherSampleEvidence(stage.SequencingGroupStage):
     """
     https://github.com/broadinstitute/gatk-sv#gathersampleevidence
     https://github.com/broadinstitute/gatk-sv/blob/master/wdl/GatherSampleEvidence.wdl
@@ -76,15 +78,15 @@ class GatherSampleEvidenceStage(stage.SequencingGroupStage):
 
         outputs = self.expected_outputs(sequencing_group)
 
-        jobs = GatherSampleEvidence.create_gather_sample_evidence_jobs(
+        jobs = create_gather_sample_evidence_jobs(
             sg=sequencing_group,
             expected_outputs=outputs,
         )
         return self.make_outputs(sequencing_group, data=outputs, jobs=jobs)
 
 
-@stage.stage(required_stages=GatherSampleEvidenceStage, analysis_type='qc', analysis_keys=['qc_table'])
-class EvidenceQCStage(stage.CohortStage):
+@stage.stage(required_stages=GatherSampleEvidence, analysis_type='qc', analysis_keys=['qc_table'])
+class EvidenceQC(stage.CohortStage):
     """
     https://github.com/broadinstitute/gatk-sv#evidenceqc
     """
@@ -113,18 +115,18 @@ class EvidenceQCStage(stage.CohortStage):
     def queue_jobs(self, cohort: targets.Cohort, inputs: stage.StageInput) -> stage.StageOutput:
         outputs = self.expected_outputs(cohort)
 
-        input_dict = inputs.as_dict_by_target(GatherSampleEvidenceStage)
+        input_dict = inputs.as_dict_by_target(GatherSampleEvidence)
 
-        jobs = EvidenceQC.create_evidence_qc_jobs(input_dict=input_dict, output_dict=outputs, cohort=cohort)
+        jobs = create_evidence_qc_jobs(input_dict=input_dict, output_dict=outputs, cohort=cohort)
 
         return self.make_outputs(cohort, data=outputs, jobs=jobs)
 
 
 @stage.stage(
-    required_stages=EvidenceQCStage,
+    required_stages=EvidenceQC,
     analysis_type='sv',
 )
-class CreateSampleBatchesStage(stage.MultiCohortStage):
+class CreateSampleBatches(stage.MultiCohortStage):
     """
     uses the values generated in EvidenceQC
     splits the sequencing groups into batches based on median coverage,
@@ -151,8 +153,8 @@ class CreateSampleBatchesStage(stage.MultiCohortStage):
 
         output = self.expected_outputs(multicohort)
 
-        job = CreateSampleBatches.create_sample_batches(
-            qc_tables=[inputs.as_str(cohort, EvidenceQCStage, 'qc_table') for cohort in multicohort.get_cohorts()],
+        job = create_sample_batches(
+            qc_tables=[inputs.as_str(cohort, EvidenceQC, 'qc_table') for cohort in multicohort.get_cohorts()],
             tmp_prefix=self.tmp_prefix,
             output_json=str(output),
         )
@@ -168,7 +170,7 @@ def cli_main():
     parser.add_argument('--dry_run', action='store_true', help='Dry run')
     args = parser.parse_args()
 
-    workflow.run_workflow(stages=[CreateSampleBatchesStage], dry_run=args.dry_run)
+    workflow.run_workflow(stages=[CreateSampleBatches], dry_run=args.dry_run)
 
 
 if __name__ == '__main__':
