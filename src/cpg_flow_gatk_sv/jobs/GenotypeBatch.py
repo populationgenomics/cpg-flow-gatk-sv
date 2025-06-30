@@ -53,6 +53,16 @@ def create_genotypebatch_jobs(
         ]
     }
 
+    # add references
+    input_dict |= utils.get_references(
+        [
+            'primary_contigs_list',
+            'bin_exclude',
+            'seed_cutoffs',
+            'pesr_exclude_list',
+        ]
+    )
+
     return utils.add_gatk_sv_jobs(
         dataset=cohort.dataset,
         wfl_name='GenotypeBatch',
