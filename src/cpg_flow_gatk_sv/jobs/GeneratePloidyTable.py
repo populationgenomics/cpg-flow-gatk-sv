@@ -28,9 +28,9 @@ def create_generate_ploidy_jobs(
 
     job.command(f"""
     python3 -m cpg_flow_gatk_sv.scripts.ploidy_table_from_ped \
-            --pedigree {pedigree} \
+            --ped {pedigree} \
             --output {job.output} \
-            --contig_list {contig_path}
+            --contigs {contig_path}
     """)
 
     hail_batch.get_batch().write_output(job.output, output)

@@ -129,11 +129,31 @@ run_module_metrics = false
 n_per_split = 5001
 n_RD_genotype_bins = 100000
 
+[resource_overrides.FilterGenotypes]
+run_qc = false
+
 [resource_overrides.MakeCohortVcf]
 run_module_metrics = false
 
-[resource_overrides.FilterGenotypes]
-run_qc = false
+[resource_overrides.MakeCohortVcf.runtime_attr_join_vcfs]
+mem_gb = 32
+disk_gb = 50
+cpu = 2
+
+[resource_overrides.MakeCohortVcf.runtime_attr_recluster_part1]
+mem_gb = 32
+disk_gb = 50
+cpu = 2
+
+[resource_overrides.MakeCohortVcf.runtime_attr_recluster_part2]
+mem_gb = 32
+disk_gb = 50
+cpu = 2
+
+[resource_overrides.MakeCohortVcf.runtime_attr_cluster_sites]
+mem_gb = 32
+disk_gb = 50
+cpu = 2
 
 #[hail]
 #billing_project = "test-vcgs-dataset"
