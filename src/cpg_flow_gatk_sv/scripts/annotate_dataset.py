@@ -133,7 +133,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Annotate SV dataset MatrixTable')
     parser.add_argument('--mt', required=True, help='Path to the input MatrixTable')
     parser.add_argument('--dataset_mt', required=True, help='Path to write the single-dataset MT')
-    parser.add_argument('--out_mt', required=True, help='Path to write the final MatrixTable')
+    parser.add_argument('--output', required=True, help='Path to write the final MatrixTable')
     parser.add_argument(
         '--sample_id_file',
         required=True,

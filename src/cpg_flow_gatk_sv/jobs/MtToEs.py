@@ -57,7 +57,7 @@ def create_mt_to_es_job(
     job.command(f"""
         python3 -m cpg_flow_gatk_sv.scripts.mt_to_es_export \
             --mt "${{BATCH_TMPDIR}}/{mt_name}" \
-            --es_index {outputs['index_name']!s} \
+            --index {outputs['index_name']!s} \
             --flag {outputs['flag']!s} \
     """)
 

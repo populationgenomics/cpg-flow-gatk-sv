@@ -13,7 +13,7 @@ def create_filter_wham_jobs(
     in_vcf = hail_batch.get_batch().read_input_group(**{'vcf.gz': input_vcf, 'vcf.gz.tbi': f'{input_vcf}.tbi'})[
         'vcf.gz'
     ]
-    job = hail_batch.get_batch().new_job('Filter Wham', attributes={'tool': 'bcftools'})
+    job = hail_batch.get_batch().new_bash_job('Filter Wham', attributes={'tool': 'bcftools'})
     job.image(config.config_retrieve(['images', 'bcftools']))
     job.cpu(1).memory('highmem').storage('20Gi')
 

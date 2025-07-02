@@ -241,7 +241,7 @@ class ElasticsearchClient:
 
 def main():
     parser = ArgumentParser(description='Argument Parser for the ES generation script')
-    parser.add_argument('--mt_path', help='MT path name', required=True)
+    parser.add_argument('--mt', help='MT path name', required=True)
     parser.add_argument('--index', help='ES index name', required=True)
     parser.add_argument('--flag', help='ES index "DONE" file path')
     args = parser.parse_args()
