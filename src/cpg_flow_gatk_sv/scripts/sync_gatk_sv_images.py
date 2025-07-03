@@ -29,17 +29,13 @@ def main():
 
     response = urlopen(args.docker_json)
     dockers_json = json.loads(response.read())
-    dockers_json.pop('name')
 
     config_section = {}
-    for i, key in enumerate(dockers_json):
-        image_name = dockers_json[key].split('/')[-1]
+    for key, value in dockers_json.items():
+        image_name = value.split('/')[-1]
         cpg_ar_path = 'australia-southeast1-docker.pkg.dev/cpg-common/images/sv/' + image_name
-        print(f'#{i}: copying {key}: {dockers_json[key]} to {cpg_ar_path}')
-        src_path = 'docker://' + dockers_json[key]
-        dst_path = 'docker://' + cpg_ar_path
-        cmd = f'skopeo copy {src_path} {dst_path}'
-        subprocess.run(cmd, shell=True, check=True)
+        print(f'Copying {key}: {value} to {cpg_ar_path}')
+        subprocess.run(f'skopeo copy docker://{value} docker://{cpg_ar_path}', shell=True, check=True)
         config_section[key] = cpg_ar_path
 
     print()
