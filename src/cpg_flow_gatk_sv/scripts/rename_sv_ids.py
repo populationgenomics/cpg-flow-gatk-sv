@@ -95,4 +95,4 @@ if __name__ == '__main__':
     )
     args = parser.parse_args()
 
-    rename_sv_ids(args.tmp, args.output)
+    rename_sv_ids(args.input_vcf, args.output_vcf, skip_prior_names=args.skip_prior_names)
