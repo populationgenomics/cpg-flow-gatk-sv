@@ -23,9 +23,7 @@ def create_strvctvre_jobs(
     job.storage(config.config_retrieve(['resource_overrides', name, 'storage'], '10Gi'))
     job.memory(config.config_retrieve(['resource_overrides', name, 'memory'], '16Gi'))
 
-    strvctvre_phylop = utils.get_references(['strvctvre_phylop'])['strvctvre_phylop']
-
-    local_phylop = hail_batch.get_batch().read_input(strvctvre_phylop)
+    phylop = hail_batch.get_batch().read_input(config.config_retrieve(['references', 'strvctvre_phylop']))
 
     job.declare_resource_group(
         output={
@@ -36,7 +34,7 @@ def create_strvctvre_jobs(
 
     # run strvctvre
     job.command(
-        f'python StrVCTVRE.py -i {input_vcf} -o {job.output["vcf.gz"]} -f vcf -p {local_phylop}',
+        f'python StrVCTVRE.py -i {input_vcf} -o {job.output["vcf.gz"]} -f vcf -p {phylop}',
     )
     job.command(f'tabix {job.output["vcf.gz"]}')
 

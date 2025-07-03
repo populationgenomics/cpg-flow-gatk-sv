@@ -69,6 +69,11 @@ def create_makecohortvcf_jobs(
         'rf_cutoff_files': filter_batch_cutoffs,
         'track_names': track_names,
         'track_bed_files': track_bed_files,
+        'gatk_docker': config.config_retrieve(['images', 'gatk_docker']),
+        'linux_docker': config.config_retrieve(['images', 'linux_docker']),
+        'sv_base_mini_docker': config.config_retrieve(['images', 'sv_base_mini_docker']),
+        'sv_pipeline_docker': config.config_retrieve(['images', 'sv_pipeline_docker']),
+        'sv_pipeline_qc_docker': config.config_retrieve(['images', 'sv_pipeline_qc_docker']),
     }
 
     input_dict |= utils.get_references(
@@ -89,19 +94,6 @@ def create_makecohortvcf_jobs(
             {'pe_exclude_list': 'pesr_exclude_list'},
         ],
     )
-
-    # add the images required for this step
-    input_dict |= {
-        key: config.config_retrieve(['images', key])
-        for key in [
-            'gatk_docker',
-            'sv_pipeline_docker',
-            'sv_pipeline_qc_docker',
-            'sv_base_mini_docker',
-            'linux_docker',
-        ]
-    }
-
     return utils.add_gatk_sv_jobs(
         dataset=multicohort.analysis_dataset,
         wfl_name='MakeCohortVcf',

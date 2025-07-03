@@ -52,8 +52,6 @@ primary_contigs_list = "gs://cpg-common-main/references/hg38/v0/sv-resources/res
 
 wgd_scoring_mask = "gs://cpg-common-main/references/hg38/v0/sv-resources/resources/v1/wgd_scoring_mask.hg38.gnomad_v3.bed"
 
-[references.gatk_sv]
-
 # genome tracks are a list of CPG config keys
 genome_tracks = [
     'recalibrate_gq_repeatmasker',
@@ -69,6 +67,9 @@ genome_tracks_index = [
     'recalibrate_gq_umap_s100_index',
     'recalibrate_gq_umap_s24_index',
 ]
+
+[references.gatk_sv]
+
 recalibrate_gq_args = [
     '--keep-homvar false',
     '--keep-homref true',

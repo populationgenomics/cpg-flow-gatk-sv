@@ -30,11 +30,9 @@ def create_filtergenotypes_jobs(
         'sv_base_mini_docker': config.config_retrieve(['images', 'sv_base_mini_docker']),
         'sv_pipeline_docker': config.config_retrieve(['images', 'sv_pipeline_docker']),
         'genome_tracks': list(
-            utils.get_references(config.config_retrieve(['references', 'gatk_sv', 'genome_tracks'], [])).values(),
+            utils.get_references(config.config_retrieve(['references', 'genome_tracks'], [])).values(),
         ),
     }
-
-    # something a little trickier - we need to get various genome tracks
 
     return utils.add_gatk_sv_jobs(
         dataset=multicohort.analysis_dataset,

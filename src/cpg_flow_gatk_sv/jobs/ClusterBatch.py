@@ -42,21 +42,15 @@ def create_cluster_batch_jobs(
         'reference_fasta': fasta_file,
         'reference_fasta_fai': f'{fasta_file}.fai',
         'reference_dict': str(to_path(fasta_file).with_suffix('.dict')),
+        'gatk_docker': config.config_retrieve(['images', 'gatk_docker']),
+        'linux_docker': config.config_retrieve(['images', 'linux_docker']),
+        'sv_base_mini_docker': config.config_retrieve(['images', 'sv_base_mini_docker']),
+        'sv_pipeline_docker': config.config_retrieve(['images', 'sv_pipeline_docker']),
+        'sv_pipeline_qc_docker': config.config_retrieve(['images', 'sv_pipeline_qc_docker']),
     }
 
     for caller in utils.SV_CALLERS:
         input_dict[f'{caller}_vcf_tar'] = str(batch_evidence_outputs[f'std_{caller}_vcf_tar'])
-
-    # add the images required for this step
-    input_dict |= {
-        key: config.config_retrieve(['images', key])
-        for key in [
-            'linux_docker',
-            'gatk_docker',
-            'sv_base_mini_docker',
-            'sv_pipeline_docker',
-        ]
-    }
 
     input_dict |= utils.get_references(
         [
