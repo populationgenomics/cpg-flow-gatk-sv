@@ -312,20 +312,16 @@ def queue_annotate_strvctvre_job(
     job_attrs = job_attrs or {}
     strv_job = hail_batch.get_batch().new_bash_job('StrVCTVRE', job_attrs | {'tool': 'strvctvre'})
 
-    strv_job.image(config.image_path('strvctvre'))
+    strv_job.image(config.config_retrieve(['images', 'strvctvre']))
     strv_job.storage(config.config_retrieve(['resource_overrides', name, 'storage'], '10Gi'))
     strv_job.memory(config.config_retrieve(['resource_overrides', name, 'memory'], '16Gi'))
 
-    strvctvre_phylop = get_references(['strvctvre_phylop'])['strvctvre_phylop']
-
-    local_phylop = hail_batch.get_batch().read_input(strvctvre_phylop)
+    phylop = hail_batch.get_batch().read_input(config.config_retrieve(['references', 'strvctvre_phylop']))
 
     strv_job.declare_resource_group(output={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
 
     # run strvctvre
-    strv_job.command(
-        f'python StrVCTVRE.py -i {input_vcf} -o {strv_job.output["vcf.gz"]} -f vcf -p {local_phylop}',
-    )
+    strv_job.command(f'python StrVCTVRE.py -i {input_vcf} -o {strv_job.output["vcf.gz"]} -f vcf -p {phylop}')
     strv_job.command(f'tabix {strv_job.output["vcf.gz"]}')
 
     hail_batch.get_batch().write_output(strv_job.output, str(output_path).replace('.vcf.gz', ''))

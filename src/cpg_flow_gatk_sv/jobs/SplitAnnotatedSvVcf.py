@@ -14,18 +14,7 @@ def create_split_vcf_by_dataset_job(
     output: str,
     job_attrs: dict[str, str],
 ) -> 'BashJob':
-    """
-
-    Args:
-        dataset ():
-        input_vcf ():
-        dataset_sgid_file ():
-        output_vcf ():
-        job_attrs ():
-
-    Returns:
-
-    """
+    """Split the MultiCohort VCF by dataset."""
 
     local_vcf = hail_batch.get_batch().read_input(input_vcf)
     local_sgids = hail_batch.get_batch().read_input(dataset_sgid_file)
@@ -34,7 +23,7 @@ def create_split_vcf_by_dataset_job(
         name=f'SplitAnnotatedSvVcfByDataset: {dataset.name}',
         attributes=job_attrs | {'tool': 'bcftools'},
     )
-    job.image(config.config_retrieve(['images', 'bcftools_120']))
+    job.image(config.config_retrieve(['images', 'bcftools']))
     job.cpu(1).memory('highmem').storage('10Gi')
     job.declare_resource_group(
         output={

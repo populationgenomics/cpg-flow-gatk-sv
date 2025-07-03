@@ -23,29 +23,18 @@ def create_filtergenotypes_jobs(
         'fmax_beta': config.config_retrieve(['references', 'gatk_sv', 'fmax_beta'], 0.4),
         'recalibrate_gq_args': config.config_retrieve(['references', 'gatk_sv', 'recalibrate_gq_args']),
         'sl_filter_args': config.config_retrieve(['references', 'gatk_sv', 'sl_filter_args']),
+        'primary_contigs_fai': config.config_retrieve(['references', 'primary_contigs_fai']),
+        'gq_recalibrator_model_file': config.config_retrieve(['references', 'aou_filtering_model']),
+        'gatk_docker': config.config_retrieve(['images', 'gq_recalibrator_docker']),
+        'linux_docker': config.config_retrieve(['images', 'linux_docker']),
+        'sv_base_mini_docker': config.config_retrieve(['images', 'sv_base_mini_docker']),
+        'sv_pipeline_docker': config.config_retrieve(['images', 'sv_pipeline_docker']),
+        'genome_tracks': list(
+            utils.get_references(config.config_retrieve(['references', 'gatk_sv', 'genome_tracks'], [])).values(),
+        ),
     }
-    input_dict |= {
-        key: config.config_retrieve(['images', key])
-        for key in [
-            'linux_docker',
-            'sv_base_mini_docker',
-            'sv_pipeline_docker',
-        ]
-    }
-
-    # use a non-standard GATK image containing required filtering tool
-    input_dict['gatk_docker'] = config.config_retrieve(['images', 'gq_recalibrator_docker'])
-    input_dict |= utils.get_references(
-        [
-            {'gq_recalibrator_model_file': 'aou_filtering_model'},
-            'primary_contigs_fai',
-        ],
-    )
 
     # something a little trickier - we need to get various genome tracks
-    input_dict['genome_tracks'] = list(
-        utils.get_references(config.config_retrieve(['references', 'gatk_sv', 'genome_tracks'], [])).values(),
-    )
 
     return utils.add_gatk_sv_jobs(
         dataset=multicohort.analysis_dataset,

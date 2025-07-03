@@ -33,11 +33,11 @@ def create_makecohortvcf_jobs(
     disc_files = [gatherbatchevidence_outputs[cohort]['merged_PE'] for cohort in all_batch_names]
     median_cov_files = [gatherbatchevidence_outputs[cohort]['median_cov'] for cohort in all_batch_names]
 
-    track_names = config.config_retrieve(['references', 'gatk_sv', 'clustering_track_names'])
+    track_names = config.config_retrieve(['references', 'clustering_track_names'])
     track_bed_files = [
-        config.config_retrieve(['references', 'gatk_sv', 'clustering_track_sr']),
-        config.config_retrieve(['references', 'gatk_sv', 'clustering_track_sd']),
-        config.config_retrieve(['references', 'gatk_sv', 'clustering_track_rm']),
+        config.config_retrieve(['references', 'clustering_track_sr']),
+        config.config_retrieve(['references', 'clustering_track_sd']),
+        config.config_retrieve(['references', 'clustering_track_rm']),
     ]
 
     input_dict = {
