@@ -22,12 +22,12 @@ def main():
     )
     args = parser.parse_args()
 
-    subprocess.run(
-        ['gcloud', 'auth', 'configure-docker', 'australia-southeast1-docker.pkg.dev'],
+    subprocess.run(  # noqa: S603
+        ['gcloud', 'auth', 'configure-docker', 'australia-southeast1-docker.pkg.dev'],  # noqa: S607
         check=True,
     )
 
-    response = urlopen(args.docker_json)
+    response = urlopen(args.docker_json)  # noqa: S310
     dockers_json = json.loads(response.read())
 
     config_section = {}
@@ -35,7 +35,7 @@ def main():
         image_name = value.split('/')[-1]
         cpg_ar_path = 'australia-southeast1-docker.pkg.dev/cpg-common/images/sv/' + image_name
         print(f'Copying {key}: {value} to {cpg_ar_path}')
-        subprocess.run(f'skopeo copy docker://{value} docker://{cpg_ar_path}', shell=True, check=True)
+        subprocess.run(f'skopeo copy docker://{value} docker://{cpg_ar_path}', shell=True, check=True)  # noqa: S602
         config_section[key] = cpg_ar_path
 
     print()
