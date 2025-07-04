@@ -50,7 +50,7 @@ def create_split_vcf_by_dataset_job(
             -S {local_sgids} \\
             -Oz \\
             -o {job.output['vcf.bgz']} \\
-            --W=tbi \\
+            -W=tbi \\
             {local_vcf}
         """,
     )
