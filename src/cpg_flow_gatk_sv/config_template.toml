@@ -125,6 +125,9 @@ manta_region_bed = "gs://cpg-common-main/references/hg38/v0/sv-resources/resourc
 manta_region_bed_index = "gs://cpg-common-main/references/hg38/v0/sv-resources/resources/v1/primary_contigs_plus_mito.bed.gz.tbi"
 wham_include_list_bed_file = "gs://cpg-common-main/references/hg38/v0/sv-resources/resources/v1/wham_whitelist.bed"
 
+rmsk = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/hg38.randomForest_blacklist.withRepMask.bed.gz"
+segdups = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/hg38.SD_gaps_Cen_Tel_Heter_Satellite_lumpy.blacklist.sorted.merged.bed.gz"
+
 # these workflows take a VCF result from a GatherSampleEvidence stage, and optionally a baseline VCF
 # from the same caller, and runs a VCFMetrics comparison of the two
 # we don't have like-for-like baselines for any of our samples (AFAIK), and the workflows don't allow
