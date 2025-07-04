@@ -36,20 +36,13 @@ def add_train_gcnv_jobs(cohort: targets.Cohort, output_dict: dict[str, Path]):
         'reference_fasta': fasta_file,
         'reference_index': f'{fasta_file}.fai',
         'reference_dict': to_path(fasta_file).with_suffix('.dict'),
-        'contig_ploidy_priors': config.reference_path('gatk_sv/contig_ploidy_priors'),
+        'contig_ploidy_priors': config.config_retrieve(['references', 'contig_ploidy_priors']),
         'num_intervals_per_scatter': 5000,
-    }
-
-    # add the images required for this step
-    cromwell_input_dict |= {
-        key: config.config_retrieve(['images', key])
-        for key in [
-            'sv_base_mini_docker',
-            'linux_docker',
-            'gatk_docker',
-            'condense_counts_docker',
-            'sv_pipeline_docker',
-        ]
+        'sv_base_mini_docker': config.config_retrieve(['images', 'sv_base_mini_docker']),
+        'linux_docker': config.config_retrieve(['images', 'linux_docker']),
+        'gatk_docker': config.config_retrieve(['images', 'gatk_docker']),
+        'condense_counts_docker': config.config_retrieve(['images', 'condense_counts_docker']),
+        'sv_pipeline_docker': config.config_retrieve(['images', 'sv_pipeline_docker']),
     }
 
     # billing labels must conform to the regex [a-z]([-a-z0-9]*[a-z0-9])?
