@@ -110,6 +110,8 @@ autosome_file = "gs://cpg-common-main/references/hg38/v0/sv-resources/resources/
 allosome_file = "gs://cpg-common-main/references/hg38/v0/sv-resources/resources/v1/allosome.fai"
 cnmops_exclude_list = "gs://cpg-common-main/references/hg38/v0/sv-resources/resources/v1/GRCh38_Nmask.bed"
 
+ped_file = "gs://cpg-common-main/references/hg38/v0/sv-resources/ref-panel/1KG/v1/ped/1kg_ref_panel_v1.ped"
+
 model_tar_tmpl = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/ref-panel/1KG/v2/gcnv/model_files/ref_panel_1kg_v2-gcnv-model-shard-{shard}.tar.gz"
 ref_panel_PE_file_tmpl = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/ref-panel/tws_SVEvidence/pe/{sample}.pe.txt.gz"
 ref_panel_SR_file_tmpl = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/ref-panel/tws_SVEvidence/sr/{sample}.sr.txt.gz"

@@ -104,26 +104,6 @@ def get_fasta_string() -> Path:
     return _FASTA_STRING
 
 
-def get_references(keys: list[str | dict[str, str]]) -> dict[str, str | list[str]]:
-    """
-    Dict of WDL inputs with reference file paths.
-    """
-    res: dict[str, str | list[str]] = {}
-    for key in keys:
-        # Keys can be maps (e.g. {'MakeCohortVcf.cytobands': 'cytoband'})
-        use_key, ref_key = next(iter(key.items())) if isinstance(key, dict) else (key, key)
-
-        # e.g. GATKSVPipelineBatch.rmsk -> rmsk
-        ref_key = ref_key.split('.')[-1]
-
-        try:
-            res[use_key] = config.reference_path(f'gatk_sv/{ref_key}')  # type: ignore[index]
-        except (KeyError, config.ConfigError):
-            res[use_key] = config.reference_path(f'broad/{ref_key}')  # type: ignore[index]
-
-    return res
-
-
 def add_gatk_sv_jobs(
     dataset: targets.Dataset,
     wfl_name: str,
@@ -250,13 +230,6 @@ def make_combined_ped(cohort: targets.Cohort | targets.MultiCohort, combined_ped
     Concatenating all samples across all datasets with ref panel
 
     See #578 - there are restrictions on valid characters in PED file
-
-    Args:
-        cohort ():
-        combined_ped_path ():
-
-    Returns:
-        None
     """
 
     # first get standard pedigree
@@ -265,7 +238,7 @@ def make_combined_ped(cohort: targets.Cohort | targets.MultiCohort, combined_ped
     if not ped_dicts:
         raise ValueError(f'No pedigree data found for {cohort.id}')
 
-    conf_ped_path = get_references(['ped_file'])['ped_file']
+    conf_ped_path = config.config_retrieve(['references', 'ped_file'])
 
     with (
         combined_ped_path.open('w') as out,
@@ -289,43 +262,6 @@ def make_combined_ped(cohort: targets.Cohort | targets.MultiCohort, combined_ped
 
         # The ref panel PED doesn't have any header, so can safely concatenate:
         out.write(ref_ped.read())
-
-
-def queue_annotate_strvctvre_job(
-    input_vcf,
-    output_path: str,
-    job_attrs: dict,
-    name: str = 'AnnotateVcfWithStrvctvre',
-) -> 'BashJob':
-    """
-
-    Args:
-        input_vcf (ResourceFile): part of a resource group with the corresponding index
-        output_path ():
-        job_attrs (dict): job attributes
-        name (str): name of the job
-
-    Returns:
-        The Strvctvre job
-    """
-
-    job_attrs = job_attrs or {}
-    strv_job = hail_batch.get_batch().new_bash_job('StrVCTVRE', job_attrs | {'tool': 'strvctvre'})
-
-    strv_job.image(config.config_retrieve(['images', 'strvctvre']))
-    strv_job.storage(config.config_retrieve(['resource_overrides', name, 'storage'], '10Gi'))
-    strv_job.memory(config.config_retrieve(['resource_overrides', name, 'memory'], '16Gi'))
-
-    phylop = hail_batch.get_batch().read_input(config.config_retrieve(['references', 'strvctvre_phylop']))
-
-    strv_job.declare_resource_group(output={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
-
-    # run strvctvre
-    strv_job.command(f'python StrVCTVRE.py -i {input_vcf} -o {strv_job.output["vcf.gz"]} -f vcf -p {phylop}')
-    strv_job.command(f'tabix {strv_job.output["vcf.gz"]}')
-
-    hail_batch.get_batch().write_output(strv_job.output, str(output_path).replace('.vcf.gz', ''))
-    return strv_job
 
 
 def check_for_cohort_overlaps(multicohort: targets.MultiCohort):
