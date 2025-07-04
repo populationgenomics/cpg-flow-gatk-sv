@@ -8,30 +8,30 @@ import loguru
 
 from cpg_flow import stage, targets, workflow
 from cpg_flow_gatk_sv import utils
-from cpg_flow_gatk_sv.jobs import (
-    AnnotateCohort,
-    AnnotateDataset,
-    AnnotateVcf,
-    AnnotateWithStrvctvre,
-    ClusterBatch,
-    CombineExclusionLists,
-    FilterBatch,
-    FilterGenotypes,
-    FilterWham,
-    FormatVcfForGatk,
-    GatherBatchEvidence,
-    GenerateBatchMetrics,
-    GeneratePloidyTable,
-    GenotypeBatch,
-    JoinRawCalls,
-    MakeCohortVcf,
-    MergeBatchSites,
-    MtToEs,
-    SpiceUpSvIds,
-    SplitAnnotatedSvVcf,
-    SVConcordance,
-    TrainGCNV,
-)
+
+from cpg_flow_gatk_sv.jobs.AnnotateCohort import create_annotate_cohort_job
+from cpg_flow_gatk_sv.jobs.AnnotateDataset import create_annotate_dataset_jobs
+from cpg_flow_gatk_sv.jobs.MtToEs import create_mt_to_es_job
+from cpg_flow_gatk_sv.jobs.AnnotateVcf import create_svannotate_jobs
+from cpg_flow_gatk_sv.jobs.AnnotateWithStrvctvre import create_strvctvre_jobs
+from cpg_flow_gatk_sv.jobs.ClusterBatch import create_cluster_batch_jobs
+from cpg_flow_gatk_sv.jobs.CombineExclusionLists import create_combine_exclusion_lists_job
+from cpg_flow_gatk_sv.jobs.FilterBatch import create_filterbatch_jobs
+from cpg_flow_gatk_sv.jobs.FilterGenotypes import create_filtergenotypes_jobs
+from cpg_flow_gatk_sv.jobs.FilterWham import create_filter_wham_jobs
+from cpg_flow_gatk_sv.jobs.FormatVcfForGatk import create_formatvcf_jobs
+from cpg_flow_gatk_sv.jobs.GatherBatchEvidence import submit_gatherbatchevidence_jobs
+from cpg_flow_gatk_sv.jobs.GenerateBatchMetrics import create_generate_batch_metrics_jobs
+from cpg_flow_gatk_sv.jobs.GeneratePloidyTable import create_generate_ploidy_jobs
+from cpg_flow_gatk_sv.jobs.GenotypeBatch import create_genotypebatch_jobs
+from cpg_flow_gatk_sv.jobs.JoinRawCalls import create_joinrawcalls_jobs
+from cpg_flow_gatk_sv.jobs.MakeCohortVcf import create_makecohortvcf_jobs
+from cpg_flow_gatk_sv.jobs.MergeBatchSites import create_mergebatchsites_jobs
+from cpg_flow_gatk_sv.jobs.SpiceUpSvIds import create_spicy_jobs
+from cpg_flow_gatk_sv.jobs.SplitAnnotatedSvVcf import create_split_vcf_by_dataset_job
+from cpg_flow_gatk_sv.jobs.SVConcordance import create_sv_concordance_jobs
+from cpg_flow_gatk_sv.jobs.TrainGCNV import add_train_gcnv_jobs
+
 from cpg_utils import Path, config
 
 
@@ -65,7 +65,7 @@ class MakeMultiCohortCombinedPed(stage.MultiCohortStage):
 
 
 @stage.stage(required_stages=[MakeCohortCombinedPed])
-class TrainGcnvStage(stage.CohortStage):
+class TrainGcnv(stage.CohortStage):
     """
     Runs TrainGCNV to generate a model trained on a selection of samples within this Cohort, used in GatherBatchEvidence
     run https://github.com/broadinstitute/gatk-sv/blob/main/wdl/TrainGCNV.wdl
@@ -87,13 +87,13 @@ class TrainGcnvStage(stage.CohortStage):
     def queue_jobs(self, cohort: targets.Cohort, inputs: stage.StageInput) -> stage.StageOutput:
         outputs = self.expected_outputs(cohort)
 
-        jobs = TrainGCNV.add_train_gcnv_jobs(cohort, output_dict=outputs)
+        jobs = add_train_gcnv_jobs(cohort, output_dict=outputs)
 
         return self.make_outputs(cohort, data=outputs, jobs=jobs)
 
 
-@stage.stage(required_stages=[MakeCohortCombinedPed, TrainGcnvStage])
-class GatherBatchEvidenceStage(stage.CohortStage):
+@stage.stage(required_stages=[MakeCohortCombinedPed, TrainGcnv])
+class GatherBatchEvidence(stage.CohortStage):
     """
     https://github.com/broadinstitute/gatk-sv#gather-batch-evidence
     https://github.com/broadinstitute/gatk-sv/blob/master/wdl/GatherBatchEvidence.wdl
@@ -150,11 +150,11 @@ class GatherBatchEvidenceStage(stage.CohortStage):
 
     def queue_jobs(self, cohort: targets.Cohort, inputs: stage.StageInput) -> stage.StageOutput:
         """Add jobs to Batch"""
-        train_gcnv_outputs = inputs.as_dict(target=cohort, stage=TrainGcnvStage)
+        train_gcnv_outputs = inputs.as_dict(target=cohort, stage=TrainGcnv)
 
         outputs = self.expected_outputs(cohort)
 
-        jobs = GatherBatchEvidence.submit_gatherbatchevidence_jobs(
+        jobs = submit_gatherbatchevidence_jobs(
             pedigree_input=inputs.as_path(target=cohort, stage=MakeCohortCombinedPed),
             cohort=cohort,
             train_gcnv=train_gcnv_outputs,
@@ -164,8 +164,8 @@ class GatherBatchEvidenceStage(stage.CohortStage):
         return self.make_outputs(cohort, data=outputs, jobs=jobs)
 
 
-@stage.stage(required_stages=[MakeCohortCombinedPed, GatherBatchEvidenceStage])
-class ClusterBatchStage(stage.CohortStage):
+@stage.stage(required_stages=[MakeCohortCombinedPed, GatherBatchEvidence])
+class ClusterBatch(stage.CohortStage):
     """
     https://github.com/broadinstitute/gatk-sv#clusterbatch
     """
@@ -189,12 +189,12 @@ class ClusterBatchStage(stage.CohortStage):
         Standardized call VCFs (GatherBatchEvidence)
         Depth-only (DEL/DUP) calls (GatherBatchEvidence)
         """
-        batch_evidence_outputs = inputs.as_dict(cohort, GatherBatchEvidenceStage)
+        batch_evidence_outputs = inputs.as_dict(cohort, GatherBatchEvidence)
         pedigree_input = inputs.as_str(target=cohort, stage=MakeCohortCombinedPed)
 
         outputs = self.expected_outputs(cohort)
 
-        jobs = ClusterBatch.create_cluster_batch_jobs(
+        jobs = create_cluster_batch_jobs(
             pedigree_input=pedigree_input,
             cohort=cohort,
             batch_evidence_outputs=batch_evidence_outputs,
@@ -203,8 +203,8 @@ class ClusterBatchStage(stage.CohortStage):
         return self.make_outputs(cohort, data=outputs, jobs=jobs)
 
 
-@stage.stage(required_stages=[MakeCohortCombinedPed, ClusterBatchStage, GatherBatchEvidenceStage])
-class GenerateBatchMetricsStage(stage.CohortStage):
+@stage.stage(required_stages=[MakeCohortCombinedPed, ClusterBatch, GatherBatchEvidence])
+class GenerateBatchMetrics(stage.CohortStage):
     """
     Generates variant metrics for filtering.
     """
@@ -220,13 +220,13 @@ class GenerateBatchMetricsStage(stage.CohortStage):
         }
 
     def queue_jobs(self, cohort: targets.Cohort, inputs: stage.StageInput) -> stage.StageOutput:
-        clusterbatch_outputs = inputs.as_dict(cohort, ClusterBatchStage)
-        gatherbatchevidence_outputs = inputs.as_dict(cohort, GatherBatchEvidenceStage)
+        clusterbatch_outputs = inputs.as_dict(cohort, ClusterBatch)
+        gatherbatchevidence_outputs = inputs.as_dict(cohort, GatherBatchEvidence)
         pedigree_input = inputs.as_str(target=cohort, stage=MakeCohortCombinedPed)
 
         outputs = self.expected_outputs(cohort)
 
-        jobs = GenerateBatchMetrics.create_generate_batch_metrics_jobs(
+        jobs = create_generate_batch_metrics_jobs(
             pedigree_input=pedigree_input,
             cohort=cohort,
             gather_batch_evidence_outputs=gatherbatchevidence_outputs,
@@ -237,8 +237,8 @@ class GenerateBatchMetricsStage(stage.CohortStage):
         return self.make_outputs(cohort, data=outputs, jobs=jobs)
 
 
-@stage.stage(required_stages=[MakeCohortCombinedPed, GenerateBatchMetricsStage, ClusterBatchStage])
-class FilterBatchStage(stage.CohortStage):
+@stage.stage(required_stages=[MakeCohortCombinedPed, GenerateBatchMetrics, ClusterBatch])
+class FilterBatch(stage.CohortStage):
     """
     Filters poor quality variants and filters outlier samples.
     """
@@ -281,13 +281,13 @@ class FilterBatchStage(stage.CohortStage):
         return d
 
     def queue_jobs(self, cohort: targets.Cohort, inputs: stage.StageInput) -> stage.StageOutput:
-        metrics_d = inputs.as_dict(cohort, GenerateBatchMetricsStage)
-        clusterbatch_d = inputs.as_dict(cohort, ClusterBatchStage)
+        metrics_d = inputs.as_dict(cohort, GenerateBatchMetrics)
+        clusterbatch_d = inputs.as_dict(cohort, ClusterBatch)
         pedigree_input = inputs.as_str(target=cohort, stage=MakeCohortCombinedPed)
 
         outputs = self.expected_outputs(cohort)
 
-        jobs = FilterBatch.create_filterbatch_jobs(
+        jobs = create_filterbatch_jobs(
             pedigree_input=pedigree_input,
             cohort=cohort,
             batch_metrics_outputs=metrics_d,
@@ -298,8 +298,8 @@ class FilterBatchStage(stage.CohortStage):
         return self.make_outputs(cohort, data=outputs, jobs=jobs)
 
 
-@stage.stage(required_stages=FilterBatchStage)
-class MergeBatchSitesStage(stage.MultiCohortStage):
+@stage.stage(required_stages=FilterBatch)
+class MergeBatchSites(stage.MultiCohortStage):
     """
     This Stage runs between GenerateBatchMetrics and FilterBatch
     This takes the component VCFs from individual batches and merges them into
@@ -314,14 +314,14 @@ class MergeBatchSitesStage(stage.MultiCohortStage):
 
     def queue_jobs(self, multicohort: targets.MultiCohort, inputs: stage.StageInput) -> stage.StageOutput:
         # take from previous per-cohort outputs
-        filter_batch_outputs = inputs.as_dict_by_target(FilterBatchStage)
+        filter_batch_outputs = inputs.as_dict_by_target(FilterBatch)
 
         pesr_vcfs = [filter_batch_outputs[cohort.id]['filtered_pesr_vcf'] for cohort in multicohort.get_cohorts()]
         depth_vcfs = [filter_batch_outputs[cohort.id]['filtered_depth_vcf'] for cohort in multicohort.get_cohorts()]
 
         outputs = self.expected_outputs(multicohort)
 
-        jobs = MergeBatchSites.create_mergebatchsites_jobs(
+        jobs = create_mergebatchsites_jobs(
             multicohort=multicohort,
             pesr_vcfs=pesr_vcfs,
             depth_vcfs=depth_vcfs,
@@ -331,8 +331,8 @@ class MergeBatchSitesStage(stage.MultiCohortStage):
         return self.make_outputs(multicohort, data=outputs, jobs=jobs)
 
 
-@stage.stage(analysis_type='sv', required_stages=FilterBatchStage)
-class CombineExclusionListsStage(stage.MultiCohortStage):
+@stage.stage(analysis_type='sv', required_stages=FilterBatch)
+class CombineExclusionLists(stage.MultiCohortStage):
     """
     Takes the per-batch lists of excluded sample IDs and combines
     them into a single file for use in the SV pipeline
@@ -355,7 +355,7 @@ class CombineExclusionListsStage(stage.MultiCohortStage):
         queue job to combine exclusion lists
         """
 
-        filter_batch_outputs = inputs.as_dict_by_target(FilterBatchStage)
+        filter_batch_outputs = inputs.as_dict_by_target(FilterBatch)
         all_filter_lists = [
             str(filter_batch_outputs[cohort.id]['outlier_samples_excluded_file'])
             for cohort in multicohort.get_cohorts()
@@ -363,17 +363,17 @@ class CombineExclusionListsStage(stage.MultiCohortStage):
 
         output = self.expected_outputs(multicohort)
 
-        job = CombineExclusionLists.create_combine_exclusion_lists_job(all_filter_lists, output)
+        job = create_combine_exclusion_lists_job(all_filter_lists, output)
 
         return self.make_outputs(multicohort, data=output, jobs=job)
 
 
 @stage.stage(
-    required_stages=[FilterBatchStage, GatherBatchEvidenceStage, MergeBatchSitesStage],
+    required_stages=[FilterBatch, GatherBatchEvidence, MergeBatchSites],
     analysis_type='sv',
     analysis_keys=['genotyped_depth_vcf', 'genotyped_pesr_vcf'],
 )
-class GenotypeBatchStage(stage.CohortStage):
+class GenotypeBatch(stage.CohortStage):
     """
     The final Cohort Stage - executed for each individual Batch
     Genotypes a batch of samples across filtered variants combined across all batches.
@@ -412,13 +412,13 @@ class GenotypeBatchStage(stage.CohortStage):
         return {key: self.get_stage_cohort_prefix(cohort) / output_hash / fname for key, fname in ending_by_key.items()}
 
     def queue_jobs(self, cohort: targets.Cohort, inputs: stage.StageInput) -> stage.StageOutput:
-        filterbatch_outputs = inputs.as_dict(cohort, FilterBatchStage)
-        batchevidence_outputs = inputs.as_dict(cohort, GatherBatchEvidenceStage)
-        mergebatch_outputs = inputs.as_dict(workflow.get_multicohort(), MergeBatchSitesStage)
+        filterbatch_outputs = inputs.as_dict(cohort, FilterBatch)
+        batchevidence_outputs = inputs.as_dict(cohort, GatherBatchEvidence)
+        mergebatch_outputs = inputs.as_dict(workflow.get_multicohort(), MergeBatchSites)
 
         outputs = self.expected_outputs(cohort)
 
-        jobs = GenotypeBatch.create_genotypebatch_jobs(
+        jobs = create_genotypebatch_jobs(
             cohort=cohort,
             gatherbatchevidence_outputs=batchevidence_outputs,
             filterbatch_outputs=filterbatch_outputs,
@@ -432,12 +432,12 @@ class GenotypeBatchStage(stage.CohortStage):
 @stage.stage(
     required_stages=[
         MakeMultiCohortCombinedPed,
-        GatherBatchEvidenceStage,
-        GenotypeBatchStage,
-        FilterBatchStage,
+        GatherBatchEvidence,
+        GenotypeBatch,
+        FilterBatch,
     ]
 )
-class MakeCohortVcfStage(stage.MultiCohortStage):
+class MakeCohortVcf(stage.MultiCohortStage):
     """
     Combines variants across multiple batches, resolves complex variants, re-genotypes, and performs final VCF clean-up.
     """
@@ -458,14 +458,14 @@ class MakeCohortVcfStage(stage.MultiCohortStage):
         Instead of taking a direct dependency on the previous stage,
         we use the output hash to find all the previous batches
         """
-        gatherbatchevidence_outputs = inputs.as_dict_by_target(GatherBatchEvidenceStage)
-        genotypebatch_outputs = inputs.as_dict_by_target(GenotypeBatchStage)
-        filterbatch_outputs = inputs.as_dict_by_target(FilterBatchStage)
+        gatherbatchevidence_outputs = inputs.as_dict_by_target(GatherBatchEvidence)
+        genotypebatch_outputs = inputs.as_dict_by_target(GenotypeBatch)
+        filterbatch_outputs = inputs.as_dict_by_target(FilterBatch)
         pedigree_input = inputs.as_path(target=multicohort, stage=MakeMultiCohortCombinedPed)
 
         outputs = self.expected_outputs(multicohort)
 
-        jobs = MakeCohortVcf.create_makecohortvcf_jobs(
+        jobs = create_makecohortvcf_jobs(
             multicohort,
             pedigree_input,
             gatherbatchevidence_outputs,
@@ -477,8 +477,8 @@ class MakeCohortVcfStage(stage.MultiCohortStage):
         return self.make_outputs(multicohort, data=outputs, jobs=jobs)
 
 
-@stage.stage(required_stages=[MakeMultiCohortCombinedPed, MakeCohortVcfStage])
-class FormatVcfForGatkStage(stage.MultiCohortStage):
+@stage.stage(required_stages=[MakeMultiCohortCombinedPed, MakeCohortVcf])
+class FormatVcfForGatk(stage.MultiCohortStage):
     def expected_outputs(self, multicohort: targets.MultiCohort) -> dict:
         return {
             'gatk_formatted_vcf': self.prefix / 'gatk_formatted.vcf.gz',
@@ -487,10 +487,10 @@ class FormatVcfForGatkStage(stage.MultiCohortStage):
 
     def queue_jobs(self, multicohort: targets.MultiCohort, inputs: stage.StageInput) -> stage.StageOutput:
         pedigree_input = inputs.as_str(target=multicohort, stage=MakeMultiCohortCombinedPed)
-        vcf_input = inputs.as_str(multicohort, MakeCohortVcfStage, 'vcf')
+        vcf_input = inputs.as_str(multicohort, MakeCohortVcf, 'vcf')
         outputs = self.expected_outputs(multicohort)
 
-        jobs = FormatVcfForGatk.create_formatvcf_jobs(
+        jobs = create_formatvcf_jobs(
             multicohort,
             pedigree_input,
             vcf_input,
@@ -500,8 +500,8 @@ class FormatVcfForGatkStage(stage.MultiCohortStage):
         return self.make_outputs(multicohort, data=outputs, jobs=jobs)
 
 
-@stage.stage(required_stages=[MakeMultiCohortCombinedPed, ClusterBatchStage])
-class JoinRawCallsStage(stage.MultiCohortStage):
+@stage.stage(required_stages=[MakeMultiCohortCombinedPed, ClusterBatch])
+class JoinRawCalls(stage.MultiCohortStage):
     """
     Joins all individually clustered caller results
     """
@@ -514,11 +514,11 @@ class JoinRawCallsStage(stage.MultiCohortStage):
 
     def queue_jobs(self, multicohort: targets.MultiCohort, inputs: stage.StageInput) -> stage.StageOutput:
         pedigree = inputs.as_str(target=multicohort, stage=MakeMultiCohortCombinedPed)
-        clusterbatch_outputs = inputs.as_dict_by_target(ClusterBatchStage)
+        clusterbatch_outputs = inputs.as_dict_by_target(ClusterBatch)
 
         outputs = self.expected_outputs(multicohort)
 
-        jobs = JoinRawCalls.create_joinrawcalls_jobs(
+        jobs = create_joinrawcalls_jobs(
             multicohort=multicohort,
             pedigree=pedigree,
             clusterbatch_outputs=clusterbatch_outputs,
@@ -528,8 +528,8 @@ class JoinRawCallsStage(stage.MultiCohortStage):
         return self.make_outputs(multicohort, data=outputs, jobs=jobs)
 
 
-@stage.stage(required_stages=[JoinRawCallsStage, FormatVcfForGatkStage])
-class SVConcordanceStage(stage.MultiCohortStage):
+@stage.stage(required_stages=[JoinRawCalls, FormatVcfForGatk])
+class SVConcordance(stage.MultiCohortStage):
     """
     Takes the clean VCF and reformat for GATK intake
     """
@@ -550,10 +550,10 @@ class SVConcordanceStage(stage.MultiCohortStage):
         """
         outputs = self.expected_outputs(multicohort)
 
-        formatvcf_output = inputs.as_str(multicohort, FormatVcfForGatkStage, 'gatk_formatted_vcf')
-        joinrawcalls_output = inputs.as_str(multicohort, JoinRawCallsStage, 'joined_raw_calls_vcf')
+        formatvcf_output = inputs.as_str(multicohort, FormatVcfForGatk, 'gatk_formatted_vcf')
+        joinrawcalls_output = inputs.as_str(multicohort, JoinRawCalls, 'joined_raw_calls_vcf')
 
-        jobs = SVConcordance.create_sv_concordance_jobs(
+        jobs = create_sv_concordance_jobs(
             multicohort=multicohort,
             formatvcf_output=formatvcf_output,
             joinrawcalls_output=joinrawcalls_output,
@@ -563,8 +563,8 @@ class SVConcordanceStage(stage.MultiCohortStage):
         return self.make_outputs(multicohort, data=outputs, jobs=jobs)
 
 
-@stage.stage(required_stages=[MakeMultiCohortCombinedPed, SVConcordanceStage])
-class GeneratePloidyTableStage(stage.MultiCohortStage):
+@stage.stage(required_stages=[MakeMultiCohortCombinedPed, SVConcordance])
+class GeneratePloidyTable(stage.MultiCohortStage):
     """
     Quick PythonJob to generate a ploidy table
     Calls a homebrewed version of this table generator:
@@ -582,7 +582,7 @@ class GeneratePloidyTableStage(stage.MultiCohortStage):
         output = self.expected_outputs(multicohort)
         pedigree_input = inputs.as_path(target=multicohort, stage=MakeMultiCohortCombinedPed)
 
-        job = GeneratePloidyTable.create_generate_ploidy_jobs(
+        job = create_generate_ploidy_jobs(
             pedigree=pedigree_input,
             output=output,
         )
@@ -591,9 +591,9 @@ class GeneratePloidyTableStage(stage.MultiCohortStage):
 
 
 @stage.stage(
-    required_stages=[MakeMultiCohortCombinedPed, GeneratePloidyTableStage, SVConcordanceStage],
+    required_stages=[MakeMultiCohortCombinedPed, GeneratePloidyTable, SVConcordance],
 )
-class FilterGenotypesStage(stage.MultiCohortStage):
+class FilterGenotypes(stage.MultiCohortStage):
     """
     Steps required to post-filter called genotypes
     """
@@ -610,10 +610,10 @@ class FilterGenotypesStage(stage.MultiCohortStage):
         outputs = self.expected_outputs(multicohort)
 
         pedigree_input = inputs.as_str(target=multicohort, stage=MakeMultiCohortCombinedPed)
-        ploidy_table = inputs.as_str(multicohort, GeneratePloidyTableStage)
-        sv_conc_vcf = inputs.as_str(multicohort, SVConcordanceStage, 'concordance_vcf')
+        ploidy_table = inputs.as_str(multicohort, GeneratePloidyTable)
+        sv_conc_vcf = inputs.as_str(multicohort, SVConcordance, 'concordance_vcf')
 
-        jobs = FilterGenotypes.create_filtergenotypes_jobs(
+        jobs = create_filtergenotypes_jobs(
             multicohort=multicohort,
             pedigree=pedigree_input,
             ploidy_table=ploidy_table,
@@ -624,7 +624,7 @@ class FilterGenotypesStage(stage.MultiCohortStage):
         return self.make_outputs(multicohort, data=outputs, jobs=jobs)
 
 
-@stage.stage(required_stages=FilterGenotypesStage)
+@stage.stage(required_stages=FilterGenotypes)
 class UpdateStructuralVariantIDs(stage.MultiCohortStage):
     """
     Runs SVConcordance between the results of this callset and the results of a previous callset
@@ -649,9 +649,9 @@ class UpdateStructuralVariantIDs(stage.MultiCohortStage):
 
         outputs = self.expected_outputs(multicohort)
 
-        filter_genotypes_output = inputs.as_str(multicohort, FilterGenotypesStage, key='filtered_vcf')
+        filter_genotypes_output = inputs.as_str(multicohort, FilterGenotypes, key='filtered_vcf')
 
-        jobs = SVConcordance.create_sv_concordance_jobs(
+        jobs = create_sv_concordance_jobs(
             multicohort=multicohort,
             formatvcf_output=filter_genotypes_output,
             joinrawcalls_output=spicy_vcf,
@@ -662,10 +662,10 @@ class UpdateStructuralVariantIDs(stage.MultiCohortStage):
 
 
 @stage.stage(
-    required_stages=[FilterGenotypesStage, UpdateStructuralVariantIDs],
+    required_stages=[FilterGenotypes, UpdateStructuralVariantIDs],
     analysis_type='sv',
 )
-class FilterWhamStage(stage.MultiCohortStage):
+class FilterWham(stage.MultiCohortStage):
     """
     Filters the VCF to remove deletions only called by Wham
     github.com/broadinstitute/gatk-sv/blob/main/wdl/ApplyManualVariantFilter.wdl
@@ -685,21 +685,21 @@ class FilterWhamStage(stage.MultiCohortStage):
             input_vcf = inputs.as_str(multicohort, UpdateStructuralVariantIDs, 'concordance_vcf')
         else:
             loguru.logger.info(f'No Spicy VCF was found, default IDs for {multicohort.analysis_dataset.name}')
-            input_vcf = inputs.as_str(multicohort, FilterGenotypesStage, 'filtered_vcf')
+            input_vcf = inputs.as_str(multicohort, FilterGenotypes, 'filtered_vcf')
 
         output = self.expected_outputs(multicohort)
 
-        job = FilterWham.create_filter_wham_jobs(input_vcf, output=str(output))
+        job = create_filter_wham_jobs(input_vcf, output=str(output))
 
         return self.make_outputs(multicohort, data=output, jobs=job)
 
 
 @stage.stage(
-    required_stages=[FilterWhamStage, MakeMultiCohortCombinedPed],
+    required_stages=[FilterWham, MakeMultiCohortCombinedPed],
     analysis_type='sv',
     analysis_keys=['annotated_vcf'],
 )
-class AnnotateVcfStage(stage.MultiCohortStage):
+class AnnotateVcf(stage.MultiCohortStage):
     """
     Add annotations, such as the inferred function and allele frequencies of variants,
     to final VCF.
@@ -731,10 +731,10 @@ class AnnotateVcfStage(stage.MultiCohortStage):
         """
         outputs = self.expected_outputs(multicohort)
 
-        input_vcf = inputs.as_str(multicohort, FilterWhamStage)
+        input_vcf = inputs.as_str(multicohort, FilterWham)
         pedigree = inputs.as_str(target=multicohort, stage=MakeMultiCohortCombinedPed)
 
-        jobs = AnnotateVcf.create_svannotate_jobs(
+        jobs = create_svannotate_jobs(
             multicohort=multicohort,
             input_vcf=input_vcf,
             pedigree=pedigree,
@@ -744,8 +744,8 @@ class AnnotateVcfStage(stage.MultiCohortStage):
         return self.make_outputs(multicohort, data=outputs, jobs=jobs)
 
 
-@stage.stage(required_stages=AnnotateVcfStage)
-class AnnotateVcfWithStrvctvreStage(stage.MultiCohortStage):
+@stage.stage(required_stages=AnnotateVcf)
+class AnnotateVcfWithStrvctvre(stage.MultiCohortStage):
     def expected_outputs(self, multicohort: targets.MultiCohort) -> dict[str, Path]:
         return {
             'strvctvre_vcf': self.prefix / 'strvctvre_annotated.vcf.gz',
@@ -753,10 +753,10 @@ class AnnotateVcfWithStrvctvreStage(stage.MultiCohortStage):
         }
 
     def queue_jobs(self, multicohort: targets.MultiCohort, inputs: stage.StageInput) -> stage.StageOutput:
-        input_vcf = inputs.as_str(multicohort, AnnotateVcfStage, 'annotated_vcf')
+        input_vcf = inputs.as_str(multicohort, AnnotateVcf, 'annotated_vcf')
         outputs = self.expected_outputs(multicohort)
 
-        job = AnnotateWithStrvctvre.create_strvctvre_jobs(
+        job = create_strvctvre_jobs(
             input_vcf=input_vcf,
             output=str(outputs['strvctvre_vcf']),
             name=self.name,
@@ -764,8 +764,8 @@ class AnnotateVcfWithStrvctvreStage(stage.MultiCohortStage):
         return self.make_outputs(multicohort, data=outputs, jobs=job)
 
 
-@stage.stage(required_stages=AnnotateVcfWithStrvctvreStage, analysis_type='sv')
-class SpiceUpSvIdsStage(stage.MultiCohortStage):
+@stage.stage(required_stages=AnnotateVcfWithStrvctvre, analysis_type='sv')
+class SpiceUpSvIds(stage.MultiCohortStage):
     """
     Overwrites the GATK-SV assigned IDs with a meaningful ID
     This new ID is either taken from an equivalent variant ID in the previous callset (found through SVConcordance)
@@ -780,9 +780,9 @@ class SpiceUpSvIdsStage(stage.MultiCohortStage):
 
     def queue_jobs(self, multicohort: targets.MultiCohort, inputs: stage.StageInput) -> stage.StageOutput:
         output = self.expected_outputs(multicohort)
-        input_vcf = inputs.as_str(multicohort, AnnotateVcfWithStrvctvreStage, 'strvctvre_vcf')
+        input_vcf = inputs.as_str(multicohort, AnnotateVcfWithStrvctvre, 'strvctvre_vcf')
 
-        jobs = SpiceUpSvIds.create_spicy_jobs(
+        jobs = create_spicy_jobs(
             input_vcf=input_vcf,
             skip_prior_names=bool(utils.query_for_spicy_vcf(multicohort.analysis_dataset.name)),
             output=str(output),
@@ -791,8 +791,8 @@ class SpiceUpSvIdsStage(stage.MultiCohortStage):
         return self.make_outputs(multicohort, data=output, jobs=jobs)
 
 
-@stage.stage(required_stages=SpiceUpSvIdsStage)
-class AnnotateCohortStage(stage.MultiCohortStage):
+@stage.stage(required_stages=SpiceUpSvIds)
+class AnnotateCohort(stage.MultiCohortStage):
     """
     First step to transform annotated SV callset data into a seqr ready format
     """
@@ -809,9 +809,9 @@ class AnnotateCohortStage(stage.MultiCohortStage):
         """
         output = self.expected_outputs(multicohort)
 
-        vcf_path = inputs.as_str(target=multicohort, stage=SpiceUpSvIdsStage)
+        vcf_path = inputs.as_str(target=multicohort, stage=SpiceUpSvIds)
 
-        job = AnnotateCohort.create_annotate_cohort_job(
+        job = create_annotate_cohort_job(
             vcf=vcf_path,
             out_mt=output,
             checkpoint=self.tmp_prefix / 'checkpoint.mt',
@@ -822,10 +822,10 @@ class AnnotateCohortStage(stage.MultiCohortStage):
 
 
 @stage.stage(
-    required_stages=[CombineExclusionListsStage, AnnotateCohortStage],
+    required_stages=[CombineExclusionLists, AnnotateCohort],
     analysis_type='sv',
 )
-class AnnotateDatasetStage(stage.DatasetStage):
+class AnnotateDataset(stage.DatasetStage):
     """
     Subset the MT to be this Dataset only
     Then work up all the genotype values
@@ -849,14 +849,14 @@ class AnnotateDatasetStage(stage.DatasetStage):
             return None
 
         multicohort = workflow.get_multicohort()
-        cohort_mt = inputs.as_str(target=multicohort, stage=AnnotateCohortStage)
-        exclusion_file = inputs.as_str(multicohort, stage=CombineExclusionListsStage)
+        cohort_mt = inputs.as_str(target=multicohort, stage=AnnotateCohort)
+        exclusion_file = inputs.as_str(multicohort, stage=CombineExclusionLists)
 
         output = self.expected_outputs(dataset)
 
         dataset_sgid_file = utils.write_dataset_sg_ids(dataset)
 
-        job = AnnotateDataset.create_annotate_dataset_jobs(
+        job = create_annotate_dataset_jobs(
             mt=cohort_mt,
             sgid_file=dataset_sgid_file,
             mt_out=output,
@@ -869,12 +869,12 @@ class AnnotateDatasetStage(stage.DatasetStage):
 
 
 @stage.stage(
-    required_stages=[AnnotateDatasetStage],
+    required_stages=[AnnotateDataset],
     analysis_type='es-index',
     analysis_keys=['index_name'],
     update_analysis_meta=lambda x: {'seqr-dataset-type': 'SV'},  # noqa: ARG005
 )
-class MtToEsStage(stage.DatasetStage):
+class MtToEs(stage.DatasetStage):
     """
     Create a Seqr index
     https://github.com/populationgenomics/metamist/issues/539
@@ -903,8 +903,8 @@ class MtToEsStage(stage.DatasetStage):
         outputs = self.expected_outputs(dataset)
 
         # get the absolute path to the MT
-        mt_path = inputs.as_str(target=dataset, stage=AnnotateDatasetStage)
-        job_or_none = MtToEs.create_mt_to_es_job(
+        mt_path = inputs.as_str(target=dataset, stage=AnnotateDataset)
+        job_or_none = create_mt_to_es_job(
             dataset=dataset,
             mt_path=mt_path,
             outputs=outputs,
@@ -915,7 +915,7 @@ class MtToEsStage(stage.DatasetStage):
 
 
 @stage.stage(
-    required_stages=SpiceUpSvIdsStage,
+    required_stages=SpiceUpSvIds,
     analysis_type='single_dataset_sv_annotated',
 )
 class SplitAnnotatedSvVcfByDataset(stage.DatasetStage):
@@ -932,11 +932,11 @@ class SplitAnnotatedSvVcfByDataset(stage.DatasetStage):
     def queue_jobs(self, dataset: targets.Dataset, inputs: stage.StageInput) -> stage.StageOutput:
         output = self.expected_outputs(dataset)
 
-        input_vcf = inputs.as_str(workflow.get_multicohort(), SpiceUpSvIdsStage)
+        input_vcf = inputs.as_str(workflow.get_multicohort(), SpiceUpSvIds)
 
         dataset_sgid_file = utils.write_dataset_sg_ids(dataset)
 
-        job = SplitAnnotatedSvVcf.create_split_vcf_by_dataset_job(
+        job = create_split_vcf_by_dataset_job(
             dataset=dataset,
             input_vcf=input_vcf,
             dataset_sgid_file=dataset_sgid_file,
@@ -957,25 +957,25 @@ def cli_main():
 
     workflow.run_workflow(
         stages=[
-            TrainGcnvStage,
+            TrainGcnv,
             MakeCohortCombinedPed,
             MakeMultiCohortCombinedPed,
-            GatherBatchEvidenceStage,
-            ClusterBatchStage,
-            GenerateBatchMetricsStage,
-            FilterBatchStage,
-            MergeBatchSitesStage,
-            CombineExclusionListsStage,
-            GenotypeBatchStage,
-            MakeCohortVcfStage,
-            JoinRawCallsStage,
-            GeneratePloidyTableStage,
-            FilterGenotypesStage,
-            AnnotateVcfStage,
-            AnnotateVcfWithStrvctvreStage,
-            AnnotateCohortStage,
-            AnnotateDatasetStage,
-            MtToEsStage,
+            GatherBatchEvidence,
+            ClusterBatch,
+            GenerateBatchMetrics,
+            FilterBatch,
+            MergeBatchSites,
+            CombineExclusionLists,
+            GenotypeBatch,
+            MakeCohortVcf,
+            JoinRawCalls,
+            GeneratePloidyTable,
+            FilterGenotypes,
+            AnnotateVcf,
+            AnnotateVcfWithStrvctvre,
+            AnnotateCohort,
+            AnnotateDataset,
+            MtToEs,
             SplitAnnotatedSvVcfByDataset,
         ],
         dry_run=args.dry_run,
