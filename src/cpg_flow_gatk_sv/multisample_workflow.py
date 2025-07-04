@@ -8,10 +8,8 @@ import loguru
 
 from cpg_flow import stage, targets, workflow
 from cpg_flow_gatk_sv import utils
-
 from cpg_flow_gatk_sv.jobs.AnnotateCohort import create_annotate_cohort_job
 from cpg_flow_gatk_sv.jobs.AnnotateDataset import create_annotate_dataset_jobs
-from cpg_flow_gatk_sv.jobs.MtToEs import create_mt_to_es_job
 from cpg_flow_gatk_sv.jobs.AnnotateVcf import create_svannotate_jobs
 from cpg_flow_gatk_sv.jobs.AnnotateWithStrvctvre import create_strvctvre_jobs
 from cpg_flow_gatk_sv.jobs.ClusterBatch import create_cluster_batch_jobs
@@ -27,11 +25,11 @@ from cpg_flow_gatk_sv.jobs.GenotypeBatch import create_genotypebatch_jobs
 from cpg_flow_gatk_sv.jobs.JoinRawCalls import create_joinrawcalls_jobs
 from cpg_flow_gatk_sv.jobs.MakeCohortVcf import create_makecohortvcf_jobs
 from cpg_flow_gatk_sv.jobs.MergeBatchSites import create_mergebatchsites_jobs
+from cpg_flow_gatk_sv.jobs.MtToEs import create_mt_to_es_job
 from cpg_flow_gatk_sv.jobs.SpiceUpSvIds import create_spicy_jobs
 from cpg_flow_gatk_sv.jobs.SplitAnnotatedSvVcf import create_split_vcf_by_dataset_job
 from cpg_flow_gatk_sv.jobs.SVConcordance import create_sv_concordance_jobs
 from cpg_flow_gatk_sv.jobs.TrainGCNV import add_train_gcnv_jobs
-
 from cpg_utils import Path, config
 
 
