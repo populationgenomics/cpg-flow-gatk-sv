@@ -41,27 +41,14 @@ def create_genotypebatch_jobs(
         'batch_pesr_vcf': filterbatch_outputs['filtered_pesr_vcf'],
         'cohort_depth_vcf': mergebatchsites_outputs['cohort_depth_vcf'],
         'cohort_pesr_vcf': mergebatchsites_outputs['cohort_pesr_vcf'],
+        'primary_contigs_list': config.config_retrieve(['references', 'primary_contigs_list']),
+        'seed_cutoffs': config.config_retrieve(['references', 'seed_cutoffs']),
+        'pesr_exclude_list': config.config_retrieve(['references', 'pesr_exclude_list']),
+        'bin_exclude': config.config_retrieve(['references', 'bin_exclude']),
+        'linux_docker': config.config_retrieve(['images', 'linux_docker']),
+        'sv_base_mini_docker': config.config_retrieve(['images', 'sv_base_mini_docker']),
+        'sv_pipeline_docker': config.config_retrieve(['images', 'sv_pipeline_docker']),
     }
-
-    # add the images required for this step
-    input_dict |= {
-        key: config.config_retrieve(['images', key])
-        for key in [
-            'sv_base_mini_docker',
-            'sv_pipeline_docker',
-            'linux_docker',
-        ]
-    }
-
-    # add references
-    input_dict |= utils.get_references(
-        [
-            'primary_contigs_list',
-            'bin_exclude',
-            'seed_cutoffs',
-            'pesr_exclude_list',
-        ]
-    )
 
     return utils.add_gatk_sv_jobs(
         dataset=cohort.dataset,

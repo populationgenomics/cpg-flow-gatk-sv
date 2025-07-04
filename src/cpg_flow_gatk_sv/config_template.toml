@@ -68,8 +68,10 @@ genome_tracks_index = [
     'recalibrate_gq_umap_s24_index',
 ]
 
+bin_exclude = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/bin_exclude.hg38.gatkcov.bed.gz"
 depth_exclude_list = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/depth_blacklist.sorted.bed.gz"
 pesr_exclude_list = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/PESR.encode.peri_all.repeats.delly.hg38.blacklist.sorted.bed.gz"
+seed_cutoffs = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/seed_cutoff.txt"
 
 [references.gatk_sv]
 
