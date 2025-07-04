@@ -158,7 +158,7 @@ def annotate_cohort_sv(vcf_path: str, out_mt_path: str, gencode_gz: str, checkpo
 
     # reimplementation of
     # github.com/populationgenomics/seqr-loading-pipelines..luigi_pipeline/lib/model/sv_mt_schema.py
-    population_prefix = config.config_retrieve(['references', 'gatk_sv', 'external_af_ref_bed_prefix'])
+    population_prefix = config.config_retrieve(['references', 'external_af_ref_bed_prefix'])
     mt = mt.annotate_rows(
         sc=mt.info.AC[0],
         sf=mt.info.AF[0],
@@ -190,7 +190,7 @@ def annotate_cohort_sv(vcf_path: str, out_mt_path: str, gencode_gz: str, checkpo
     )
 
     # get the Gene-Symbol mapping dict
-    gene_id_mapping = parse_gtf_from_local(gencode_gz)[0]
+    gene_id_mapping = parse_gtf_from_local(gencode_gz)
 
     # OK, NOW IT'S BUSINESS TIME
     conseq_predicted_gene_cols = [
@@ -200,7 +200,7 @@ def annotate_cohort_sv(vcf_path: str, out_mt_path: str, gencode_gz: str, checkpo
     ]
 
     # register a chain file
-    liftover_path = config.reference_path('liftover_38_to_37')
+    liftover_path = config.config_retrieve(['references', 'liftover_38_to_37'])
     rg37 = hl.get_reference('GRCh37')
     rg38 = hl.get_reference('GRCh38')
     rg38.add_liftover(str(liftover_path), rg37)

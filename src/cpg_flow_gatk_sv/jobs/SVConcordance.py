@@ -14,28 +14,15 @@ def create_sv_concordance_jobs(
     joinrawcalls_output: str,
     outputs: dict[str, Path],
 ) -> list['BashJob']:
-    fasta_file = utils.get_fasta_string()
-
     input_dict = {
         'output_prefix': multicohort.name,
-        'reference_dict': str(to_path(fasta_file).with_suffix('.dict')),
+        'reference_dict': str(to_path(config.config_retrieve(['workflow', 'ref_fasta'])).with_suffix('.dict')),
         'eval_vcf': formatvcf_output,
         'truth_vcf': joinrawcalls_output,
+        'contig_list': config.config_retrieve(['references', 'primary_contigs_list']),
+        'gatk_docker': config.config_retrieve(['images', 'gatk_docker']),
+        'sv_base_mini_docker': config.config_retrieve(['images', 'sv_base_mini_docker']),
     }
-
-    # add the images required for this step
-    input_dict |= {
-        key: config.config_retrieve(['images', key])
-        for key in [
-            'gatk_docker',
-            'sv_base_mini_docker',
-        ]
-    }
-    input_dict |= utils.get_references(
-        [
-            {'contig_list': 'primary_contigs_list'},
-        ]
-    )
 
     return utils.add_gatk_sv_jobs(
         dataset=multicohort.analysis_dataset,

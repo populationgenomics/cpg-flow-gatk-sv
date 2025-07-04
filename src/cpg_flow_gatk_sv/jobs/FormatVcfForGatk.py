@@ -18,18 +18,10 @@ def create_formatvcf_jobs(
         'prefix': multicohort.name,
         'vcf': vcf_input,
         'ped_file': pedigree_input,
+        'contig_list': config.config_retrieve(['references', 'primary_contigs_list']),
+        'sv_pipeline_docker': config.config_retrieve(['images', 'sv_pipeline_docker']),
+        'sv_base_mini_docker': config.config_retrieve(['images', 'sv_base_mini_docker']),
     }
-
-    # add the images required for this step
-    input_dict |= {
-        key: config.config_retrieve(['images', key])
-        for key in [
-            'sv_pipeline_docker',
-            'sv_base_mini_docker',
-        ]
-    }
-
-    input_dict |= utils.get_references([{'contig_list': 'primary_contigs_list'}])
 
     return utils.add_gatk_sv_jobs(
         dataset=multicohort.analysis_dataset,

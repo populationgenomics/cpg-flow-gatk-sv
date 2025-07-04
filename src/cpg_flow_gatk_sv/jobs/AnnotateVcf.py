@@ -19,28 +19,18 @@ def create_svannotate_jobs(
         'prefix': multicohort.name,
         'ped_file': pedigree,
         'sv_per_shard': 5000,
-        'external_af_population': config.config_retrieve(['references', 'gatk_sv', 'external_af_population']),
-        'external_af_ref_prefix': config.config_retrieve(['references', 'gatk_sv', 'external_af_ref_bed_prefix']),
+        'external_af_population': config.config_retrieve(['references', 'external_af_population']),
+        'external_af_ref_prefix': config.config_retrieve(['references', 'external_af_ref_bed_prefix']),
         'external_af_ref_bed': config.config_retrieve(['references', 'gnomad_sv']),
         'use_hail': False,
+        'noncoding_bed': config.config_retrieve(['references', 'noncoding_bed']),
+        'protein_coding_gtf': config.config_retrieve(['references', 'protein_coding_gtf']),
+        'contig_list': config.config_retrieve(['references', 'primary_contigs_list']),
+        'gatk_docker': config.config_retrieve(['images', 'gq_recalibrator_docker']),
+        'sv_base_mini_docker': config.config_retrieve(['images', 'sv_base_mini_docker']),
+        'sv_pipeline_docker': config.config_retrieve(['images', 'sv_pipeline_docker']),
     }
 
-    input_dict |= utils.get_references(
-        [
-            'noncoding_bed',
-            'protein_coding_gtf',
-            {'contig_list': 'primary_contigs_list'},
-        ],
-    )
-
-    input_dict |= {
-        key: config.config_retrieve(['images', key])
-        for key in [
-            'sv_pipeline_docker',
-            'sv_base_mini_docker',
-            'gatk_docker',
-        ]
-    }
     return utils.add_gatk_sv_jobs(
         dataset=multicohort.analysis_dataset,
         wfl_name='AnnotateVcf',
