@@ -74,26 +74,21 @@ def create_makecohortvcf_jobs(
         'sv_base_mini_docker': config.config_retrieve(['images', 'sv_base_mini_docker']),
         'sv_pipeline_docker': config.config_retrieve(['images', 'sv_pipeline_docker']),
         'sv_pipeline_qc_docker': config.config_retrieve(['images', 'sv_pipeline_qc_docker']),
+        'bin_exclude': config.config_retrieve(['references', 'bin_exclude']),
+        'clustering_config_part1': config.config_retrieve(['references', 'clustering_config_part1']),
+        'clustering_config_part2': config.config_retrieve(['references', 'clustering_config_part2']),
+        'mei_bed': config.config_retrieve(['references', 'mei_bed']),
+        'stratification_config_part1': config.config_retrieve(['references', 'stratification_config_part1']),
+        'stratification_config_part2': config.config_retrieve(['references', 'stratification_config_part2']),
+        'primary_contigs_list': config.config_retrieve(['references', 'primary_contigs_list']),
+        'allosome_fai': config.config_retrieve(['references', 'allosome_file']),
+        'contig_list': config.config_retrieve(['references', 'primary_contigs_list']),
+        'cytobands': config.config_retrieve(['references', 'cytobands']),
+        'HERVK_reference': config.config_retrieve(['references', 'hervk_reference']),
+        'LINE1_reference': config.config_retrieve(['references', 'line1_reference']),
+        'pe_exclude_list': config.config_retrieve(['references', 'pesr_exclude_list']),
     }
 
-    input_dict |= utils.get_references(
-        [
-            'bin_exclude',
-            'clustering_config_part1',
-            'clustering_config_part2',
-            'mei_bed',
-            'stratification_config_part1',
-            'stratification_config_part2',
-            # same attr, two names
-            'primary_contigs_list',
-            {'allosome_fai': 'allosome_file'},
-            {'contig_list': 'primary_contigs_list'},
-            {'cytobands': 'cytoband'},
-            {'HERVK_reference': 'hervk_reference'},
-            {'LINE1_reference': 'line1_reference'},
-            {'pe_exclude_list': 'pesr_exclude_list'},
-        ],
-    )
     return utils.add_gatk_sv_jobs(
         dataset=multicohort.analysis_dataset,
         wfl_name='MakeCohortVcf',
