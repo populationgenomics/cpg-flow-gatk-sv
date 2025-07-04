@@ -119,6 +119,12 @@ liftover_38_to_37 = "gs://cpg-common-main/references/liftover/grch38_to_grch37.o
 
 contig_ploidy_priors = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/hg38.contig_ploidy_priors_homo_sapiens.tsv"
 
+preprocessed_intervals = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/preprocessed_intervals.interval_list"
+
+manta_region_bed = "gs://cpg-common-main/references/hg38/v0/sv-resources/resources/v1/primary_contigs_plus_mito.bed.gz"
+manta_region_bed_index = "gs://cpg-common-main/references/hg38/v0/sv-resources/resources/v1/primary_contigs_plus_mito.bed.gz.tbi"
+wham_include_list_bed_file = "gs://cpg-common-main/references/hg38/v0/sv-resources/resources/v1/wham_whitelist.bed"
+
 # these workflows take a VCF result from a GatherSampleEvidence stage, and optionally a baseline VCF
 # from the same caller, and runs a VCFMetrics comparison of the two
 # we don't have like-for-like baselines for any of our samples (AFAIK), and the workflows don't allow
