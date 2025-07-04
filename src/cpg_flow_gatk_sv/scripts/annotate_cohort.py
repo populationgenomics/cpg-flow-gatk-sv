@@ -158,7 +158,7 @@ def annotate_cohort_sv(vcf_path: str, out_mt_path: str, gencode_gz: str, checkpo
 
     # reimplementation of
     # github.com/populationgenomics/seqr-loading-pipelines..luigi_pipeline/lib/model/sv_mt_schema.py
-    population_prefix = config.config_retrieve(['references', 'gatk_sv', 'external_af_ref_bed_prefix'])
+    population_prefix = config.config_retrieve(['references', 'external_af_ref_bed_prefix'])
     mt = mt.annotate_rows(
         sc=mt.info.AC[0],
         sf=mt.info.AF[0],
