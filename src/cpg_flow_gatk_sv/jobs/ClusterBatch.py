@@ -14,19 +14,7 @@ def create_cluster_batch_jobs(
     batch_evidence_outputs: dict[str, Path],
     outputs: dict[str, Path],
 ) -> list['BashJob']:
-    """
-
-    Args:
-        pedigree_input ():
-        cohort ():
-        batch_evidence_outputs ():
-        outputs ():
-
-    Returns:
-
-    """
-
-    fasta_file = utils.get_fasta_string()
+    fasta_file = config.config_retrieve(['workflow', 'ref_fasta'])
 
     input_dict = {
         'batch': cohort.id,

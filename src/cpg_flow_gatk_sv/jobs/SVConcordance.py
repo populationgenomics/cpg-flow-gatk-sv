@@ -14,11 +14,9 @@ def create_sv_concordance_jobs(
     joinrawcalls_output: str,
     outputs: dict[str, Path],
 ) -> list['BashJob']:
-    fasta_file = utils.get_fasta_string()
-
     input_dict = {
         'output_prefix': multicohort.name,
-        'reference_dict': str(to_path(fasta_file).with_suffix('.dict')),
+        'reference_dict': str(to_path(config.config_retrieve(['workflow', 'ref_fasta'])).with_suffix('.dict')),
         'eval_vcf': formatvcf_output,
         'truth_vcf': joinrawcalls_output,
         'contig_list': config.config_retrieve(['references', 'primary_contigs_list']),

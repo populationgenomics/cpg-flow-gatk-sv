@@ -15,7 +15,7 @@ def create_gather_sample_evidence_jobs(
     sg: targets.SequencingGroup,
     expected_outputs: dict[str, Path],
 ) -> list['BashJob']:
-    fasta_file = utils.get_fasta_string()
+    fasta_file = config.config_retrieve(['workflow', 'ref_fasta'])
 
     input_dict: dict[str, Any] = {
         'bam_or_cram_file': str(sg.cram),

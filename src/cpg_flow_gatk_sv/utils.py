@@ -94,16 +94,6 @@ def create_polling_intervals() -> dict:
     return polling_interval_dict
 
 
-def get_fasta_string() -> Path:
-    """
-    find or return the fasta to use
-    """
-    global _FASTA_STRING
-    if _FASTA_STRING is None:
-        _FASTA_STRING = config.config_retrieve(['workflow', 'ref_fasta'])
-    return _FASTA_STRING
-
-
 def add_gatk_sv_jobs(
     dataset: targets.Dataset,
     wfl_name: str,

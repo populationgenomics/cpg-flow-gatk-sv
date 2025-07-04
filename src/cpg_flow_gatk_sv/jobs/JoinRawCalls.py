@@ -14,19 +14,7 @@ def create_joinrawcalls_jobs(
     clusterbatch_outputs: dict[str, Path],
     outputs: dict[str, Path],
 ) -> list['BashJob']:
-    """
-
-    Args:
-        multicohort ():
-        pedigree ():
-        clusterbatch_outputs ():
-        outputs ():
-
-    Returns:
-
-    """
-
-    fasta_file = utils.get_fasta_string()
+    fasta_file = config.config_retrieve(['workflow', 'ref_fasta'])
     input_dict = {
         'FormatVcfForGatk.formatter_args': '--fix-end',
         'prefix': multicohort.name,

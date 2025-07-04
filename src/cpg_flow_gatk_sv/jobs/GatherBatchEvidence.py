@@ -28,7 +28,7 @@ def submit_gatherbatchevidence_jobs(
 
     sequencing_groups = cohort.get_sequencing_groups(only_active=True)
 
-    fasta_file = utils.get_fasta_string()
+    fasta_file = config.config_retrieve(['workflow', 'ref_fasta'])
 
     input_dict = {
         'batch': cohort.id,
