@@ -99,7 +99,7 @@ fmax_beta = 0.3
 mei_bed = "gs://cpg-common-main/references/hg38/v0/sv-resources/resources/v1/mei_hg38.bed.gz"
 cytobands = "gs://cpg-common-main/references/hg38/v0/sv-resources/resources/v1/cytobands_hg38.bed.gz"
 genome_file = "gs://cpg-common-main/references/hg38/v0/sv-resources/resources/v1/hg38.genome"
-#
+
 dbsnp_vcf = "gs://cpg-common-main/references/hg38/v0/Homo_sapiens_assembly38.dbsnp138.vcf"
 dbsnp_vcf_index = "gs://cpg-common-main/references/hg38/v0/Homo_sapiens_assembly38.dbsnp138.vcf.idx"
 
