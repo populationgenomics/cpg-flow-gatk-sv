@@ -34,23 +34,11 @@ def create_joinrawcalls_jobs(
         'reference_fasta': fasta_file,
         'reference_fasta_fai': f'{fasta_file}.fai',
         'reference_dict': str(to_path(fasta_file).with_suffix('.dict')),
+        'contig_list': config.config_retrieve(['references', 'primary_contigs_list']),
+        'gatk_docker': config.config_retrieve(['images', 'gatk_docker']),
+        'sv_base_mini_docker': config.config_retrieve(['images', 'sv_base_mini_docker']),
+        'sv_pipeline_docker': config.config_retrieve(['images', 'sv_pipeline_docker']),
     }
-
-    # add the images required for this step
-    input_dict |= {
-        key: config.config_retrieve(['images', key])
-        for key in [
-            'gatk_docker',
-            'sv_pipeline_docker',
-            'sv_base_mini_docker',
-        ]
-    }
-
-    input_dict |= utils.get_references(
-        [
-            {'contig_list': 'primary_contigs_list'},
-        ],
-    )
 
     # get the names of all contained cohorts
     all_batch_names = [cohort.id for cohort in multicohort.get_cohorts()]
