@@ -190,7 +190,7 @@ def annotate_cohort_sv(vcf_path: str, out_mt_path: str, gencode_gz: str, checkpo
     )
 
     # get the Gene-Symbol mapping dict
-    gene_id_mapping = parse_gtf_from_local(gencode_gz)[0]
+    gene_id_mapping = parse_gtf_from_local(gencode_gz)
 
     # OK, NOW IT'S BUSINESS TIME
     conseq_predicted_gene_cols = [
