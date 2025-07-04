@@ -47,18 +47,13 @@ def create_cluster_batch_jobs(
         'sv_base_mini_docker': config.config_retrieve(['images', 'sv_base_mini_docker']),
         'sv_pipeline_docker': config.config_retrieve(['images', 'sv_pipeline_docker']),
         'sv_pipeline_qc_docker': config.config_retrieve(['images', 'sv_pipeline_qc_docker']),
+        'contig_list': config.config_retrieve(['references', 'primary_contigs_list']),
+        'depth_exclude_intervals': config.config_retrieve(['references', 'depth_exclude_list']),
+        'pesr_exclude_intervals': config.config_retrieve(['references', 'pesr_exclude_list']),
     }
 
     for caller in utils.SV_CALLERS:
         input_dict[f'{caller}_vcf_tar'] = str(batch_evidence_outputs[f'std_{caller}_vcf_tar'])
-
-    input_dict |= utils.get_references(
-        [
-            {'contig_list': 'primary_contigs_list'},
-            {'depth_exclude_intervals': 'depth_exclude_list'},
-            {'pesr_exclude_intervals': 'pesr_exclude_list'},
-        ],
-    )
 
     billing_labels = {'stage': 'clusterbatch', config.AR_GUID_NAME: config.try_get_ar_guid()}
 

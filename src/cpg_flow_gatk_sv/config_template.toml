@@ -68,6 +68,9 @@ genome_tracks_index = [
     'recalibrate_gq_umap_s24_index',
 ]
 
+depth_exclude_list = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/depth_blacklist.sorted.bed.gz"
+pesr_exclude_list = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/PESR.encode.peri_all.repeats.delly.hg38.blacklist.sorted.bed.gz"
+
 [references.gatk_sv]
 
 recalibrate_gq_args = [
@@ -145,6 +148,7 @@ run_module_metrics = false
 [resource_overrides.GenotypeBatch]
 run_module_metrics = false
 # If we run into silent failures in integrateGQ.sh, modify the number of splits (affecting number of shards)
+# this was a temporary fix for an edge case in GATK-SV, which has since been patched
 n_per_split = 5001
 n_RD_genotype_bins = 100000
 

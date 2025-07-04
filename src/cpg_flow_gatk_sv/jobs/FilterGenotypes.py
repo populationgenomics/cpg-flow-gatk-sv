@@ -29,9 +29,7 @@ def create_filtergenotypes_jobs(
         'linux_docker': config.config_retrieve(['images', 'linux_docker']),
         'sv_base_mini_docker': config.config_retrieve(['images', 'sv_base_mini_docker']),
         'sv_pipeline_docker': config.config_retrieve(['images', 'sv_pipeline_docker']),
-        'genome_tracks': list(
-            utils.get_references(config.config_retrieve(['references', 'genome_tracks'], [])).values(),
-        ),
+        'genome_tracks': config.config_retrieve(['references', 'genome_tracks']),
     }
 
     return utils.add_gatk_sv_jobs(
