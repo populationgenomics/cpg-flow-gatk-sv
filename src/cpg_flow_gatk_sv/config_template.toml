@@ -73,7 +73,15 @@ depth_exclude_list = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resourc
 pesr_exclude_list = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/PESR.encode.peri_all.repeats.delly.hg38.blacklist.sorted.bed.gz"
 seed_cutoffs = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/seed_cutoff.txt"
 
-[references.gatk_sv]
+clustering_config_part1 = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/clustering_config.part_one.tsv"
+clustering_config_part2 = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/clustering_config.part_two.tsv"
+stratification_config_part1 = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/stratify_config.part_one.tsv"
+stratification_config_part2 = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/stratify_config.part_two.tsv"
+clustering_track_sr = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/hg38.SimpRep.sorted.pad_100.merged.bed"
+clustering_track_sd = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/hg38.SegDup.sorted.merged.bed"
+clustering_track_rm = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/hg38.RM.sorted.merged.bed"
+hervk_reference = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/HERVK.sorted.bed.gz"
+line1_reference = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/LINE1.sorted.bed.gz"
 
 recalibrate_gq_args = [
     '--keep-homvar false',
@@ -83,10 +91,10 @@ recalibrate_gq_args = [
     '--min-samples-to-estimate-allele-frequency -1',
 ]
 
+sl_filter_args = '--small-del-threshold 93 --medium-del-threshold 100 --small-dup-threshold -51 --medium-dup-threshold -4 --ins-threshold -13 --inv-threshold -19'
+
 # FilterGenotypes - stringent end of [0.3, 0.5] range
 fmax_beta = 0.3
-
-sl_filter_args = '--small-del-threshold 93 --medium-del-threshold 100 --small-dup-threshold -51 --medium-dup-threshold -4 --ins-threshold -13 --inv-threshold -19'
 
 # these workflows take a VCF result from a GatherSampleEvidence stage, and optionally a baseline VCF
 # from the same caller, and runs a VCFMetrics comparison of the two
