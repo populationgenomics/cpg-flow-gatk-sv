@@ -1,7 +1,7 @@
 [workflow]
 name = 'gatk_sv'
 
-gatk_sv_commit = 'dc145a52f76a6f425ac3f481171040e78c0cfeea'
+gatk_sv_commit = '81de558588cd9cad6f487dc506f5b9cc1f6167f4'
 
 check_expected_outputs = true
 
