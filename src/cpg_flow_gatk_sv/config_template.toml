@@ -2,12 +2,11 @@
 name = 'gatk_sv'
 
 gatk_sv_commit = '81de558588cd9cad6f487dc506f5b9cc1f6167f4'
+sequencing_type = 'genome'
 
 check_expected_outputs = true
 
 min_batch_size = 10
-
-sequencing_type = 'genome'
 
 ref_fasta = 'gs://cpg-common-main/references/hg38/v0/dragen_reference/Homo_sapiens_assembly38_masked.fasta'
 
@@ -149,7 +148,8 @@ gatk_docker_pesr_override = "australia-southeast1-docker.pkg.dev/cpg-common/imag
 genomes_in_the_cloud_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/genomes-in-the-cloud:2.3.2-1510681135"
 gq_recalibrator_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/gatk:mw-tb-form-sv-filter-training-data-899360a"
 linux_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/ubuntu1804"
-manta_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/manta:2023-09-14-v0.28.3-beta-3f22f94d"
+#manta_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/manta:2023-09-14-v0.28.3-beta-3f22f94d"
+manta_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/manta_no_rrr_for_ins:1.6.0-1"
 samtools_cloud_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/samtools-cloud:2024-10-25-v0.29-beta-5ea22a52"
 scramble_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/scramble:2024-10-25-v0.29-beta-5ea22a52"
 str = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/str:2023-05-23-v0.27.3-beta-e537bdd6"
