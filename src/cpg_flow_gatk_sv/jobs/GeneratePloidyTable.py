@@ -1,6 +1,5 @@
 from typing import TYPE_CHECKING
 
-from cpg_flow_gatk_sv import utils
 from cpg_utils import config, hail_batch
 
 if TYPE_CHECKING:

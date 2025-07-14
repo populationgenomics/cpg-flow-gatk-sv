@@ -1,6 +1,5 @@
 from typing import TYPE_CHECKING
 
-from cpg_flow_gatk_sv import utils
 from cpg_utils import config, hail_batch
 
 if TYPE_CHECKING:
@@ -32,7 +31,6 @@ def create_strvctvre_jobs(
         }
     )
 
-    # run strvctvre
     job.command(
         f'python StrVCTVRE.py -i {input_vcf} -o {job.output["vcf.gz"]} -f vcf -p {phylop}',
     )
