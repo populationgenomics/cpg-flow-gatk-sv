@@ -14,18 +14,6 @@ def submit_gatherbatchevidence_jobs(
     train_gcnv: dict[str, Path | list[Path]],
     outputs: dict[str, Path],
 ) -> list['BashJob']:
-    """
-
-    Args:
-        pedigree_input ():
-        cohort ():
-        train_gcnv (dict[str, Path | list[Path]]): output from TrainGCNV stage, containing the model tar files
-        outputs (dict[str, Path]): expected outputs of this stage
-
-    Returns:
-
-    """
-
     sequencing_groups = cohort.get_sequencing_groups(only_active=True)
 
     fasta_file = config.config_retrieve(['workflow', 'ref_fasta'])
@@ -89,7 +77,7 @@ def submit_gatherbatchevidence_jobs(
     ref_panel_samples = config.config_retrieve(['sv_ref_panel', 'ref_panel_samples'])
     input_dict |= {
         'ref_panel_samples': ref_panel_samples,
-        'ref_panel_bincov_matrix': config.reference_path('broad/ref_panel_bincov_matrix'),
+        'ref_panel_bincov_matrix': config.config_retrieve(['references', 'ref_panel_bincov_matrix']),
         'contig_ploidy_model_tar': str(train_gcnv['cohort_contig_ploidy_model_tar']),
         'gcnv_model_tars': [str(x) for x in train_gcnv['cohort_gcnv_model_tars']],
         'ref_panel_PE_files': [

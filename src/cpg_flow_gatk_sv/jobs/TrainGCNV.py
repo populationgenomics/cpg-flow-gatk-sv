@@ -7,17 +7,10 @@ from cpg_utils import Path, config, to_path
 
 
 def add_train_gcnv_jobs(cohort: targets.Cohort, output_dict: dict[str, Path]):
-    """
-
-    Returns:
-
-    """
-
     # optionally do sample subsetting
     sample_n = config.config_retrieve(['train_gcnv', 'sample_n'], 100)
     all_sgids = cohort.get_sequencing_groups()
 
-    # TODO force a minimum number of samples?
     sgs_sampled_from_cohort = random.sample(all_sgids, min(len(all_sgids), sample_n))
 
     fasta_file = config.config_retrieve(['workflow', 'ref_fasta'])

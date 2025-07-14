@@ -19,14 +19,6 @@ def create_sample_batches(
     """
     pass all the QC tables from this run into a python script which will integrate that
     information into a set of sample batches for MultiSample stages
-
-    Args:
-        qc_tables ():
-        tmp_prefix ():
-        output_json (str): destination
-
-    Returns:
-        The BashJob
     """
     sequencing_groups = {
         sequencing_group.id: sequencing_group.meta
