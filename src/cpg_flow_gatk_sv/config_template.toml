@@ -138,7 +138,7 @@ segdups = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resource
 run_module_metrics = false
 
 [images]
-bcftools = "australia-southeast1-docker.pkg.dev/cpg-common/images/bcftools_120:1.20"
+bcftools = "australia-southeast1-docker.pkg.dev/cpg-common/images/bcftools:1.20-2"
 cloud_sdk_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/cloud-sdk"
 cnmops_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/cnmops:2024-11-08-v1.0-62adb329"
 condense_counts_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/gatk:4.2.6.1-57-g9e03432"
