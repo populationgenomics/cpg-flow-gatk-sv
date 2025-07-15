@@ -16,7 +16,7 @@ def create_makecohortvcf_jobs(
     filterbatch_outputs: dict[str, Path],
     outputs: dict[str, Path],
 ) -> list['BashJob']:
-    fasta_file = utils.get_fasta_string()
+    fasta_file = config.config_retrieve(['workflow', 'ref_fasta'])
 
     # get the names of all contained cohorts
     all_batch_names = [cohort.id for cohort in multicohort.get_cohorts()]
@@ -33,73 +33,62 @@ def create_makecohortvcf_jobs(
     disc_files = [gatherbatchevidence_outputs[cohort]['merged_PE'] for cohort in all_batch_names]
     median_cov_files = [gatherbatchevidence_outputs[cohort]['median_cov'] for cohort in all_batch_names]
 
-    track_names = config.config_retrieve(['references', 'gatk_sv', 'clustering_track_names'])
+    track_names = config.config_retrieve(['references', 'clustering_track_names'])
     track_bed_files = [
-        config.config_retrieve(['references', 'gatk_sv', 'clustering_track_sr']),
-        config.config_retrieve(['references', 'gatk_sv', 'clustering_track_sd']),
-        config.config_retrieve(['references', 'gatk_sv', 'clustering_track_rm']),
+        config.config_retrieve(['references', 'clustering_track_sr']),
+        config.config_retrieve(['references', 'clustering_track_sd']),
+        config.config_retrieve(['references', 'clustering_track_rm']),
     ]
 
     input_dict = {
-        'cohort_name': multicohort.name,
+        # not explicit, but these VCFs require indices
+        'HERVK_reference': config.config_retrieve(['references', 'hervk_reference']),
+        'LINE1_reference': config.config_retrieve(['references', 'line1_reference']),
+        'allosome_fai': config.config_retrieve(['references', 'allosome_file']),
         'batches': all_batch_names,
-        'ped_file': str(pedigree_input),
-        'reference_fasta': fasta_file,
-        'reference_fasta_fai': f'{fasta_file}.fai',
-        'reference_dict': str(to_path(fasta_file).with_suffix('.dict')),
+        'bin_exclude': config.config_retrieve(['references', 'bin_exclude']),
+        'bincov_files': bincov_files,
         'chr_x': 'chrX',
         'chr_y': 'chrY',
-        'min_sr_background_fail_batches': 0.5,
-        'max_shard_size_resolve': 500,
-        'max_shards_per_chrom_clean_vcf_step1': 200,
-        'min_records_per_shard_clean_vcf_step1': 5000,
         'clean_vcf1b_records_per_shard': 10000,
-        'samples_per_clean_vcf_step2_shard': 100,
         'clean_vcf5_records_per_shard': 5000,
-        'random_seed': 0,
+        'clustering_config_part1': config.config_retrieve(['references', 'clustering_config_part1']),
+        'clustering_config_part2': config.config_retrieve(['references', 'clustering_config_part2']),
+        'cohort_name': multicohort.name,
+        'contig_list': config.config_retrieve(['references', 'primary_contigs_list']),
+        'cytobands': config.config_retrieve(['references', 'cytobands']),
+        'depth_gt_rd_sep_files': depth_depth_cutoff,
         # not explicit, but these VCFs require indices
-        'pesr_vcfs': pesr_vcfs,
         'depth_vcfs': depth_vcfs,
         'disc_files': disc_files,
-        'bincov_files': bincov_files,
-        'raw_sr_bothside_pass_files': sr_pass,
-        'raw_sr_background_fail_files': sr_fail,
-        'depth_gt_rd_sep_files': depth_depth_cutoff,
+        'gatk_docker': config.config_retrieve(['images', 'gatk_docker']),
+        'linux_docker': config.config_retrieve(['images', 'linux_docker']),
+        'max_shard_size_resolve': 500,
+        'max_shards_per_chrom_clean_vcf_step1': 200,
         'median_coverage_files': median_cov_files,
+        'mei_bed': config.config_retrieve(['references', 'mei_bed']),
+        'min_records_per_shard_clean_vcf_step1': 5000,
+        'min_sr_background_fail_batches': 0.5,
+        'pe_exclude_list': config.config_retrieve(['references', 'pesr_exclude_list']),
+        'ped_file': str(pedigree_input),
+        # not explicit, but these VCFs require indices
+        'pesr_vcfs': pesr_vcfs,
+        'primary_contigs_list': config.config_retrieve(['references', 'primary_contigs_list']),
+        'random_seed': 0,
+        'raw_sr_background_fail_files': sr_fail,
+        'raw_sr_bothside_pass_files': sr_pass,
+        'reference_dict': str(to_path(fasta_file).with_suffix('.dict')),
+        'reference_fasta': fasta_file,
+        'reference_fasta_fai': f'{fasta_file}.fai',
         'rf_cutoff_files': filter_batch_cutoffs,
-        'track_names': track_names,
+        'samples_per_clean_vcf_step2_shard': 100,
+        'stratification_config_part1': config.config_retrieve(['references', 'stratification_config_part1']),
+        'stratification_config_part2': config.config_retrieve(['references', 'stratification_config_part2']),
+        'sv_base_mini_docker': config.config_retrieve(['images', 'sv_base_mini_docker']),
+        'sv_pipeline_docker': config.config_retrieve(['images', 'sv_pipeline_docker']),
+        'sv_pipeline_qc_docker': config.config_retrieve(['images', 'sv_pipeline_qc_docker']),
         'track_bed_files': track_bed_files,
-    }
-
-    input_dict |= utils.get_references(
-        [
-            'bin_exclude',
-            'clustering_config_part1',
-            'clustering_config_part2',
-            'mei_bed',
-            'stratification_config_part1',
-            'stratification_config_part2',
-            # same attr, two names
-            'primary_contigs_list',
-            {'allosome_fai': 'allosome_file'},
-            {'contig_list': 'primary_contigs_list'},
-            {'cytobands': 'cytoband'},
-            {'HERVK_reference': 'hervk_reference'},
-            {'LINE1_reference': 'line1_reference'},
-            {'pe_exclude_list': 'pesr_exclude_list'},
-        ],
-    )
-
-    # add the images required for this step
-    input_dict |= {
-        key: config.config_retrieve(['images', key])
-        for key in [
-            'gatk_docker',
-            'sv_pipeline_docker',
-            'sv_pipeline_qc_docker',
-            'sv_base_mini_docker',
-            'linux_docker',
-        ]
+        'track_names': track_names,
     }
 
     return utils.add_gatk_sv_jobs(

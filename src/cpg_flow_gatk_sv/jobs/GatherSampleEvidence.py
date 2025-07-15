@@ -15,51 +15,40 @@ def create_gather_sample_evidence_jobs(
     sg: targets.SequencingGroup,
     expected_outputs: dict[str, Path],
 ) -> list['BashJob']:
-    fasta_file = utils.get_fasta_string()
+    fasta_file = config.config_retrieve(['workflow', 'ref_fasta'])
 
     input_dict: dict[str, Any] = {
         'bam_or_cram_file': str(sg.cram),
         'bam_or_cram_index': str(sg.cram) + '.crai',
-        'sample_id': sg.id,
-        'reference_fasta': fasta_file,
-        'reference_index': f'{fasta_file}.fai',
-        'reference_dict': to_path(fasta_file).with_suffix('.dict'),
-        'reference_version': '38',
+        'cloud_sdk_docker': config.config_retrieve(['images', 'cloud_sdk_docker']),
+        'gatk_docker': config.config_retrieve(['images', 'gatk_docker']),
+        'gatk_docker_pesr_override': config.config_retrieve(['images', 'gatk_docker_pesr_override']),
+        'genomes_in_the_cloud_docker': config.config_retrieve(['images', 'genomes_in_the_cloud_docker']),
+        'manta_docker': config.config_retrieve(['images', 'manta_docker']),
+        'manta_region_bed': config.config_retrieve(['references', 'manta_region_bed']),
+        'manta_region_bed_index': config.config_retrieve(['references', 'manta_region_bed_index']),
+        'mei_bed': config.config_retrieve(['references', 'mei_bed']),
         # a cost-improvement in cloud environments
         'move_bam_or_cram_files': True,
+        'preprocessed_intervals': config.config_retrieve(['references', 'preprocessed_intervals']),
+        'primary_contigs_fai': config.config_retrieve(['references', 'primary_contigs_fai']),
+        'primary_contigs_list': config.config_retrieve(['references', 'primary_contigs_list']),
+        'reference_dict': to_path(fasta_file).with_suffix('.dict'),
+        'reference_fasta': fasta_file,
+        'reference_index': f'{fasta_file}.fai',
+        'reference_version': '38',
+        'sample_id': sg.id,
+        'samtools_cloud_docker': config.config_retrieve(['images', 'samtools_cloud_docker']),
+        'scramble_docker': config.config_retrieve(['images', 'scramble_docker']),
+        'sd_locs_vcf': config.config_retrieve(['references', 'dbsnp_vcf']),
+        'sv_base_mini_docker': config.config_retrieve(['images', 'sv_base_mini_docker']),
+        'sv_pipeline_docker': config.config_retrieve(['images', 'sv_pipeline_docker']),
+        'wham_docker': config.config_retrieve(['images', 'wham_docker']),
+        'wham_include_list_bed_file': config.config_retrieve(['references', 'wham_include_list_bed_file']),
     }
 
     # If DRAGEN input is going to be used, first the input parameter 'is_dragen_3_7_8' needs to be set to True
     # then some parameters need to be added to the input_dict to enable BWA to be run
-
-    input_dict |= {
-        key: config.config_retrieve(['images', key])
-        for key in [
-            'sv_pipeline_docker',
-            'sv_base_mini_docker',
-            'samtools_cloud_docker',
-            'manta_docker',
-            'scramble_docker',
-            'wham_docker',
-            'gatk_docker',
-            'gatk_docker_pesr_override',
-            'genomes_in_the_cloud_docker',
-            'cloud_sdk_docker',
-        ]
-    }
-
-    input_dict |= utils.get_references(
-        [
-            'primary_contigs_fai',
-            'primary_contigs_list',
-            'preprocessed_intervals',
-            'manta_region_bed',
-            'manta_region_bed_index',
-            'mei_bed',
-            'wham_include_list_bed_file',
-            {'sd_locs_vcf': 'dbsnp_vcf'},
-        ],
-    )
 
     if only_jobs := config.config_retrieve(['workflow', STAGE_NAME, 'only_jobs'], None):
         # if only_jobs is set, only run the specified jobs

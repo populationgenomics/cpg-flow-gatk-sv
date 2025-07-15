@@ -14,30 +14,11 @@ def create_mergebatchsites_jobs(
     depth_vcfs: list[Path],
     outputs: dict[str, Path],
 ) -> list['BashJob']:
-    """
-
-    Args:
-        multicohort ():
-        pesr_vcfs ():
-        depth_vcfs ():
-        outputs ():
-
-    Returns:
-
-    """
-
     input_dict = {
         'cohort': multicohort.name,
         'depth_vcfs': depth_vcfs,
         'pesr_vcfs': pesr_vcfs,
-    }
-
-    # add the images required for this step
-    input_dict |= {
-        key: config.config_retrieve(['images', key])
-        for key in [
-            'sv_pipeline_docker',
-        ]
+        'sv_pipeline_docker': config.config_retrieve(['images', 'sv_pipeline_docker']),
     }
 
     return utils.add_gatk_sv_jobs(

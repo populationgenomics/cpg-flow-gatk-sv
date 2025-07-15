@@ -10,7 +10,7 @@ def create_spicy_jobs(
     input_vcf: str,
     skip_prior_names: bool,
     output: str,
-) -> 'BashJob':
+) -> list['BashJob']:
     local_input_vcf = hail_batch.get_batch().read_input(input_vcf)
 
     # update the IDs using a PythonJob

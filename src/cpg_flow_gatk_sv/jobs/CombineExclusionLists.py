@@ -10,16 +10,6 @@ def create_combine_exclusion_lists_job(
     file_list: list[str],
     output: str,
 ) -> 'BashJob':
-    """
-
-    Args:
-        file_list ():
-        output ():
-
-    Returns:
-
-    """
-
     job = hail_batch.get_batch().new_bash_job('Concatenate all sample exclusion files')
     job.image(config.config_retrieve(['workflow', 'driver_image']))
     hail_batch.authenticate_cloud_credentials_in_job(job)
