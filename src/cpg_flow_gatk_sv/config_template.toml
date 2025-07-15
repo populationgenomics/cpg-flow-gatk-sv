@@ -26,7 +26,7 @@ gencode_gtf_file = 'gs://cpg-common-main/references/hg38/v0/gencode_47.gtf.gz'
 [references]
 ref_panel_bincov_matrix = "gs://cpg-common-main/references/hg38/v0/sv-resources/ref-panel/1KG/v1/merged_evidence/ref_panel_1kg_v1.bincov.bed.gz"
 
-strvctvre_phylop = 'gs://cpg-common-test/references/hg38.phyloP100way.bw'
+strvctvre_phylop = 'gs://cpg-common-main/references/hg38.phyloP100way.bw'
 primary_contigs_fai = "gs://cpg-common-main/references/hg38/v0/sv-resources/resources/v1/contig.fai"
 primary_contigs_list = "gs://cpg-common-main/references/hg38/v0/sv-resources/resources/v1/primary_contigs.list"
 
@@ -34,7 +34,7 @@ primary_contigs_list = "gs://cpg-common-main/references/hg38/v0/sv-resources/res
 # credit must be given in accordance with the AoU publication policy.
 # Access to this file was provided on a one-off basis, and is not publicly available.
 # If an updated model is required, contact Mark Walker at the Broad Institute
-aou_filtering_model = 'gs://cpg-common-test/references/gatk-sv/gatk-sv-recalibrator.aou_phase_1.v1.model'
+aou_filtering_model = 'gs://cpg-common-main/references/gatk-sv/gatk-sv-recalibrator.aou_phase_1.v1.model'
 
 # used in MakeCohortVcf
 clustering_track_sr = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/hg38.SimpRep.sorted.pad_100.merged.bed"
