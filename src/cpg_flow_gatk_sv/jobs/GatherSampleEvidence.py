@@ -1,6 +1,5 @@
-from typing import TYPE_CHECKING, Any
-
 import os
+from typing import TYPE_CHECKING, Any
 
 from cpg_flow import targets
 from cpg_flow_gatk_sv import utils
