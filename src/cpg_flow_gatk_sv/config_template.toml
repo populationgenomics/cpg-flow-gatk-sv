@@ -77,9 +77,6 @@ clustering_config_part1 = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-re
 clustering_config_part2 = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/clustering_config.part_two.tsv"
 stratification_config_part1 = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/stratify_config.part_one.tsv"
 stratification_config_part2 = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/stratify_config.part_two.tsv"
-clustering_track_sr = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/hg38.SimpRep.sorted.pad_100.merged.bed"
-clustering_track_sd = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/hg38.SegDup.sorted.merged.bed"
-clustering_track_rm = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/hg38.RM.sorted.merged.bed"
 hervk_reference = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/HERVK.sorted.bed.gz"
 line1_reference = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/LINE1.sorted.bed.gz"
 
@@ -103,7 +100,6 @@ genome_file = "gs://cpg-common-main/references/hg38/v0/sv-resources/resources/v1
 dbsnp_vcf = "gs://cpg-common-main/references/hg38/v0/Homo_sapiens_assembly38.dbsnp138.vcf"
 dbsnp_vcf_index = "gs://cpg-common-main/references/hg38/v0/Homo_sapiens_assembly38.dbsnp138.vcf.idx"
 
-wgd_scoring_mask = "gs://cpg-common-main/references/hg38/v0/sv-resources/resources/v1/wgd_scoring_mask.hg38.gnomad_v3.bed"
 allosomal_contigs = "gs://cpg-common-main/references/hg38/v0/sv-resources/resources/v1/allosome.fai"
 inclusion_bed = "gs://cpg-common-main/references/hg38/v0/sv-resources/resources/v1/hg38_primary_contigs.bed"
 autosome_file = "gs://cpg-common-main/references/hg38/v0/sv-resources/resources/v1/autosome.fai"
