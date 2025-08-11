@@ -3,10 +3,12 @@ single-sample components of the GATK SV workflow
 """
 
 import argparse
+import os
 
 from cpg_flow import stage, targets, workflow
 from cpg_flow_gatk_sv import utils
 from cpg_flow_gatk_sv.jobs.CreateSampleBatches import create_sample_batches
+from cpg_flow_gatk_sv.jobs.DeleteSingleSampleTemp import delete_temp_data_recursive
 from cpg_flow_gatk_sv.jobs.EvidenceQC import create_evidence_qc_jobs
 from cpg_flow_gatk_sv.jobs.GatherSampleEvidence import create_gather_sample_evidence_jobs
 from cpg_utils import Path, config
@@ -87,6 +89,40 @@ class GatherSampleEvidence(stage.SequencingGroupStage):
             expected_outputs=outputs,
         )
         return self.make_outputs(sequencing_group, data=outputs, jobs=jobs)
+
+
+@stage.stage(required_stages=GatherSampleEvidence)
+class DeleteSingleSampleTemp(stage.MultiCohortStage):
+    """
+    MultiCohortStage, once per run. This will only run once all Single-Sample variant calling jobs in the current
+    workflow have succeeded.
+
+    Identifying individual SG's paths is complicated as the temp-path includes the Cromwell run ID.
+    By waiting until all SingleSampleCalling jobs have completed, we can safely delete all tmp recursively.
+    """
+
+    def expected_outputs(self, mc: targets.MultiCohort) -> Path:
+        return self.prefix / 'SingleSampleCallingTmpDeleted.txt'
+
+    def queue_jobs(self, mc: targets.MultiCohort, inputs: stage.StageInput) -> stage.StageOutput:
+        """
+        Deletes the temporary files created by GatherSampleEvidence.
+        This is a no-op stage, but it is useful to ensure that the temporary files are deleted.
+        """
+        output = self.expected_outputs(mc)
+
+        delete_path = os.path.join(
+            config.config_retrieve(['storage', 'default', 'tmp']),
+            'cromwell',
+            'GatherSampleEvidence',
+        )
+
+        job = delete_temp_data_recursive(
+            temp_path=delete_path,
+            logfile=output,
+        )
+
+        return self.make_outputs(mc, data=output, jobs=job)
 
 
 @stage.stage(required_stages=GatherSampleEvidence, analysis_type='qc', analysis_keys=['qc_table'])
@@ -174,7 +210,7 @@ def cli_main():
     parser.add_argument('--dry_run', action='store_true', help='Dry run')
     args = parser.parse_args()
 
-    workflow.run_workflow(stages=[CreateSampleBatches], dry_run=args.dry_run)
+    workflow.run_workflow(stages=[CreateSampleBatches, DeleteSingleSampleTemp], dry_run=args.dry_run)
 
 
 if __name__ == '__main__':
