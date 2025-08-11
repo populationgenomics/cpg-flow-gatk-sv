@@ -219,6 +219,9 @@ mem_gb = 32
 disk_gb = 50
 cpu = 2
 
+[resource_overrides.JoinRawCalls.runtime_attr_svcluster]
+mem_gb = 16
+
 #[hail]
 #billing_project = "test-vcgs-dataset"
 #delete_scratch_on_exit = true
