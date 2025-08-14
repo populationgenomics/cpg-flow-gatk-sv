@@ -180,6 +180,9 @@ run_module_metrics = false
 [resource_overrides.ClusterBatch]
 run_module_metrics = false
 
+[resource_overrides.JoinRawCalls.runtime_attr_svcluster]
+mem_gb = 3.75
+
 [resource_overrides.GenerateBatchMetrics]
 run_module_metrics = false
 
