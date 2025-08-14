@@ -34,7 +34,6 @@ def create_cluster_batch_jobs(
         'linux_docker': config.config_retrieve(['images', 'linux_docker']),
         'sv_base_mini_docker': config.config_retrieve(['images', 'sv_base_mini_docker']),
         'sv_pipeline_docker': config.config_retrieve(['images', 'sv_pipeline_docker']),
-        'sv_pipeline_qc_docker': config.config_retrieve(['images', 'sv_pipeline_qc_docker']),
         'contig_list': config.config_retrieve(['references', 'primary_contigs_list']),
         'depth_exclude_intervals': config.config_retrieve(['references', 'depth_exclude_list']),
         'pesr_exclude_intervals': config.config_retrieve(['references', 'pesr_exclude_list']),
