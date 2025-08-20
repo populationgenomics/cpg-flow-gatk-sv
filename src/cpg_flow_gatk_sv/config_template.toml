@@ -1,7 +1,7 @@
 [workflow]
 name = 'gatk_sv'
 
-gatk_sv_commit = '81de558588cd9cad6f487dc506f5b9cc1f6167f4'
+gatk_sv_commit = '890582922bccb4b651275506a34311c949417f6c'
 sequencing_type = 'genome'
 
 check_expected_outputs = true
