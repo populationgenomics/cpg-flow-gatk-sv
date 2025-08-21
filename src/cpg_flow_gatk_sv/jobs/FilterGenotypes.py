@@ -15,6 +15,8 @@ def create_filtergenotypes_jobs(
     sv_conc_vcf: str,
     outputs: dict[str, Path],
 ) -> list['BashJob']:
+    genome_tracks = config.config_retrieve(['references', 'genome_tracks'])
+    genome_tracks_paths = [config.config_retrieve(['references', 'gatk_sv', track]) for track in genome_tracks]
     input_dict = {
         'output_prefix': multicohort.name,
         'vcf': sv_conc_vcf,
@@ -29,7 +31,7 @@ def create_filtergenotypes_jobs(
         'linux_docker': config.config_retrieve(['images', 'linux_docker']),
         'sv_base_mini_docker': config.config_retrieve(['images', 'sv_base_mini_docker']),
         'sv_pipeline_docker': config.config_retrieve(['images', 'sv_pipeline_docker']),
-        'genome_tracks': config.config_retrieve(['references', 'genome_tracks']),
+        'genome_tracks': genome_tracks_paths,
     }
 
     return utils.add_gatk_sv_jobs(
