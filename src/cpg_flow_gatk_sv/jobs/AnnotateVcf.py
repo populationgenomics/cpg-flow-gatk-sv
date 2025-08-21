@@ -22,7 +22,6 @@ def create_svannotate_jobs(
         'external_af_population': config.config_retrieve(['references', 'external_af_population']),
         'external_af_ref_prefix': config.config_retrieve(['references', 'external_af_ref_bed_prefix']),
         'external_af_ref_bed': config.config_retrieve(['references', 'gnomad_sv']),
-        'use_hail': False,
         'noncoding_bed': config.config_retrieve(['references', 'noncoding_bed']),
         'protein_coding_gtf': config.config_retrieve(['references', 'protein_coding_gtf']),
         'contig_list': config.config_retrieve(['references', 'primary_contigs_list']),
