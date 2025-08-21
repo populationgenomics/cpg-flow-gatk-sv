@@ -52,20 +52,20 @@ protein_coding_gtf = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resourc
 
 wgd_scoring_mask = "gs://cpg-common-main/references/hg38/v0/sv-resources/resources/v1/wgd_scoring_mask.hg38.gnomad_v3.bed"
 
-# genome tracks are a list of CPG config keys
+# genome tracks are a list of paths to files
 genome_tracks = [
-    'recalibrate_gq_repeatmasker',
-    'recalibrate_gq_segmental_dups',
-    'recalibrate_gq_simple_reps',
-    'recalibrate_gq_umap_s100',
-    'recalibrate_gq_umap_s24',
+    "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/ucsc-genome-tracks/hg38-RepeatMasker.bed.gz",
+    "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/ucsc-genome-tracks/hg38-Segmental-Dups.bed.gz",
+    "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/ucsc-genome-tracks/hg38-Simple-Repeats.bed.gz",
+    "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/ucsc-genome-tracks/hg38_umap_s100.bed.gz",
+    "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/ucsc-genome-tracks/hg38_umap_s24.bed.gz",
 ]
 genome_tracks_index = [
-    'recalibrate_gq_repeatmasker_index',
-    'recalibrate_gq_segmental_dups_index',
-    'recalibrate_gq_simple_reps_index',
-    'recalibrate_gq_umap_s100_index',
-    'recalibrate_gq_umap_s24_index',
+    "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/ucsc-genome-tracks/hg38-RepeatMasker.bed.gz.tbi",
+    "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/ucsc-genome-tracks/hg38-Segmental-Dups.bed.gz.tbi",
+    "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/ucsc-genome-tracks/hg38-Simple-Repeats.bed.gz.tbi",
+    "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/ucsc-genome-tracks/hg38_umap_s100.bed.gz.tbi",
+    "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/ucsc-genome-tracks/hg38_umap_s24.bed.gz.tbi",
 ]
 
 bin_exclude = "gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/bin_exclude.hg38.gatkcov.bed.gz"
