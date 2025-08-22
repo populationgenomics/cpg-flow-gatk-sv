@@ -157,5 +157,5 @@ if __name__ == '__main__':
 
     annotate_dataset(
         args.dataset_mt,
-        args.out_mt,
+        args.output,
     )
