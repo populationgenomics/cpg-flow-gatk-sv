@@ -266,7 +266,7 @@ def main():
     hl.context.init_spark(master=f'local[{ncpu}]', quiet=True)
     hl.default_reference('GRCh38')
 
-    mt = hl.read_matrix_table(args.mt_path)
+    mt = hl.read_matrix_table(args.mt)
 
     loguru.logger.info('Getting rows and exporting to the ES')
 
