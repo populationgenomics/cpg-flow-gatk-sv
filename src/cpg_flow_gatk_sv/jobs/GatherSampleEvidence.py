@@ -93,7 +93,7 @@ def create_gather_sample_evidence_jobs(
     # this is used to determine how often to poll Cromwell for completion status
     # we alter the per-sample maximum to be between 5 and 30 minutes for this
     # long-running job, so samples poll on different intervals, spreading load
-    gather_sample_evidence_jobs = utils.add_gatk_sv_jobs(
+    return utils.add_gatk_sv_jobs(
         dataset=sg.dataset,
         wfl_name=STAGE_NAME,
         input_dict=input_dict,
@@ -102,13 +102,3 @@ def create_gather_sample_evidence_jobs(
         labels=billing_labels,
         job_size=utils.CromwellJobSizes.LARGE,
     )
-
-    deletion_job = hail_batch.get_batch().new_bash_job(f'Delete GatherSampleEvidence tmp for {sg.id}')
-    deletion_job.image(config.config_retrieve(['workflow', 'driver_image']))
-    # set explicit dependency - no variant calling success, no deletion
-    deletion_job.depends_on(*gather_sample_evidence_jobs)
-    tmp_bucket = config.config_retrieve(['storage', 'default', 'tmp'])
-    delete_path = os.path.join(tmp_bucket, 'cromwell', STAGE_NAME, sg.id)
-    deletion_job.command(f'gcloud storage rm -r {delete_path}')
-
-    return [*gather_sample_evidence_jobs, deletion_job]
