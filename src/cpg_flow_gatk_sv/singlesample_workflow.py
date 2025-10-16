@@ -174,11 +174,7 @@ def cli_main():
     parser.add_argument('--dry_run', action='store_true', help='Dry run')
     args = parser.parse_args()
 
-    workflow.run_workflow(
-        name='gatk_sv_singlesample',
-        stages=[CreateSampleBatches],
-        dry_run=args.dry_run
-    )
+    workflow.run_workflow(name='gatk_sv_singlesample', stages=[CreateSampleBatches], dry_run=args.dry_run)
 
 
 if __name__ == '__main__':
