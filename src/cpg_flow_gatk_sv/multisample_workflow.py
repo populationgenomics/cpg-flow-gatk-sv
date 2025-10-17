@@ -954,7 +954,7 @@ def cli_main():
     args = parser.parse_args()
 
     workflow.run_workflow(
-        name='gatk_sv_multisample',
+        name='gatk_sv',
         stages=[
             TrainGcnv,
             MakeCohortCombinedPed,
