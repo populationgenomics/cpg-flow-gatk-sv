@@ -10,6 +10,7 @@ from cpg_flow import stage, targets, workflow
 from cpg_flow_gatk_sv import utils
 from cpg_flow_gatk_sv.jobs.AnnotateCohort import create_annotate_cohort_job
 from cpg_flow_gatk_sv.jobs.AnnotateDataset import create_annotate_dataset_jobs
+from cpg_flow_gatk_sv.jobs.AnnotatedDatasetMtToSvVcf import cohort_to_vcf_job
 from cpg_flow_gatk_sv.jobs.AnnotateVcf import create_svannotate_jobs
 from cpg_flow_gatk_sv.jobs.AnnotateWithStrvctvre import create_strvctvre_jobs
 from cpg_flow_gatk_sv.jobs.ClusterBatch import create_cluster_batch_jobs
@@ -863,6 +864,38 @@ class AnnotateDataset(stage.DatasetStage):
             exclusion_file=exclusion_file,
         )
 
+        return self.make_outputs(dataset, data=output, jobs=job)
+
+
+@stage.stage(required_stages=[AnnotateDataset], analysis_type='custom', analysis_keys=['vcf'])
+class AnnotatedDatasetMtToSvVcf(stage.DatasetStage):
+    """
+    Take the per-dataset annotated MT and write out as a VCF
+    Optional stage set by dataset name in the config file
+    """
+
+    def expected_outputs(self, dataset: targets.Dataset):
+        """
+        Expected to generate a VCF from the single-dataset MT
+        """
+        return dataset.prefix() / 'vcf' / f'{workflow.get_workflow().output_version}-{dataset.name}-SV.vcf.bgz'
+
+    def queue_jobs(self, dataset: targets.Dataset, inputs: stage.StageInput) -> stage.StageOutput | None:
+        """Run a MT -> VCF extraction on selected cohorts - only run this on manually defined list of Datasets."""
+        # only run this selectively, most datasets it's not required
+        eligible_datasets = config.config_retrieve(['workflow', 'write_vcf'])
+        if dataset.name not in eligible_datasets:
+            return None
+
+        output = self.expected_outputs(dataset)
+
+        mt_path = inputs.as_str(target=dataset, stage=AnnotateDataset)
+
+        job = cohort_to_vcf_job(
+            input_mt=mt_path,
+            output_vcf=output,
+            job_attrs=self.get_job_attrs(dataset),
+        )
         return self.make_outputs(dataset, data=output, jobs=job)
 
 
