@@ -10,7 +10,7 @@ from cpg_flow import stage, targets, workflow
 from cpg_flow_gatk_sv import utils
 from cpg_flow_gatk_sv.jobs.AnnotateCohort import create_annotate_cohort_job
 from cpg_flow_gatk_sv.jobs.AnnotateDataset import create_annotate_dataset_jobs
-from cpg_flow_gatk_sv.jobs.AnnotatedDatasetMtToVcf import cohort_to_vcf_job
+from cpg_flow_gatk_sv.jobs.AnnotatedDatasetMtToSvVcf import cohort_to_vcf_job
 from cpg_flow_gatk_sv.jobs.AnnotateVcf import create_svannotate_jobs
 from cpg_flow_gatk_sv.jobs.AnnotateWithStrvctvre import create_strvctvre_jobs
 from cpg_flow_gatk_sv.jobs.ClusterBatch import create_cluster_batch_jobs
