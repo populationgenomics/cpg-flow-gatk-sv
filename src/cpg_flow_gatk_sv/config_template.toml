@@ -23,6 +23,9 @@ gencode_gtf_file = 'gs://cpg-common-main/references/hg38/v0/gencode_47.gtf.gz'
 # [workflow.GatherSampleEvidence]
 # only_jobs = ['coverage_counts', 'pesr', 'scramble', 'wham', 'manta']
 
+# For exporting an Annotated SV VCF for dataset(s)
+write_vcf = []
+
 [references]
 ref_panel_bincov_matrix = "gs://cpg-common-main/references/hg38/v0/sv-resources/ref-panel/1KG/v1/merged_evidence/ref_panel_1kg_v1.bincov.bed.gz"
 
