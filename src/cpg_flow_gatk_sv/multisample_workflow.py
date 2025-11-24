@@ -1007,6 +1007,7 @@ def cli_main():
             AnnotateVcfWithStrvctvre,
             AnnotateCohort,
             AnnotateDataset,
+            AnnotatedDatasetMtToSvVcf,
             MtToEs,
             SplitAnnotatedSvVcfByDataset,
         ],
