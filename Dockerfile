@@ -1,8 +1,8 @@
-FROM australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_hail_gcloud:0.2.134.cpg2-1 AS basic
+FROM australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_hail_gcloud:0.2.134.cpg2-2 AS basic
 
 ENV PYTHONDONTWRITEBYTECODE=1
+ENV VERSION=0.1.24
 
-# now do some fun stuff, installing ClinvArbitration
 WORKDIR /cpg_flow_gatk_sv
 
 COPY src src/
