@@ -1,7 +1,7 @@
-FROM australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_hail_gcloud:0.2.137.cpg1-2 AS basic
+FROM australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_hail_gcloud:0.2.138.cpg1-1 AS basic
 
 ENV PYTHONDONTWRITEBYTECODE=1
-ENV VERSION=0.1.26
+ENV VERSION=0.1.27
 
 WORKDIR /cpg_flow_gatk_sv
 
