@@ -790,7 +790,7 @@ class SpiceUpSvIds(stage.MultiCohortStage):
         return self.make_outputs(multicohort, data=output, jobs=jobs)
 
 
-@stage.stage(required_stages=SpiceUpSvIds, analysis_type='sv')
+@stage.stage(required_stages=SpiceUpSvIds, analysis_type='matrixtable')
 class AnnotateCohort(stage.MultiCohortStage):
     """
     First step to transform annotated SV callset data into a seqr ready format
