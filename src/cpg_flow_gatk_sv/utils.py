@@ -45,7 +45,7 @@ GET_ACTIVE_SGS = gql(
     """
     query SGQuery($metamist_proj: String!, $only_sgs: [String!]!){
         project(name: $metamist_proj) {
-            sequencingGroups(id: { in_: $only_sgs}) {
+            sequencingGroups(id: { in_: $only_sgs, activeOnly: {eq: true}}) {
                 id
                 active
             }
@@ -371,12 +371,12 @@ def write_dataset_sg_ids(dataset: targets.Dataset) -> Path:
     # a gql query for the SG IDs
     sg_ids = dataset.get_sequencing_group_ids()
 
+    # query for only the Active SGs in this Dataset subset
     query_result = query(GET_ACTIVE_SGS, variables={'metamist_proj': dataset.name, 'only_sgs': sg_ids})
 
-    active_sgs = {sg['id'] for sg in query_result['project']['sequencingGroups'] if sg['active']}
-
     with sgids_list_path.open('w') as f:
-        for sgid in active_sgs:
-            f.write(f'{sgid}\n')
+        for sg in query_result['project']['sequencingGroups']:
+            sg_id = sg['id']
+            f.write(f'{sg_id}\n')
 
     return sgids_list_path
