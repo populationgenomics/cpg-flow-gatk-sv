@@ -359,13 +359,10 @@ def write_dataset_sg_ids(dataset: targets.Dataset) -> Path:
     For a given dataset, write all its SGs to a file.
     Make this path specific to the dataset and run, so we can use it in multiple jobs
 
-    New behaviour - remove any SG IDs which are marked
+    New behaviour - remove any SG IDs which are marked as inactive
 
     Args:
-        dataset ():
-
-    Returns:
-
+        dataset (cpg-flow.targets.Dataset):
     """
     sgids_list_path = dataset.tmp_prefix() / workflow.get_workflow().output_version / 'sv-sgid-list.txt'
     if config.config_retrieve(['workflow', 'dry_run'], False):
