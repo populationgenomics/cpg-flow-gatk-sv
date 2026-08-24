@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 def create_joinrawcalls_jobs(
     multicohort: targets.MultiCohort,
     pedigree: str,
-    clusterbatch_outputs: dict[str, Path],
+    clusterbatch_outputs: dict[str, dict[str, Path]],
     outputs: dict[str, Path],
 ) -> list['BashJob']:
     fasta_file = config.config_retrieve(['workflow', 'ref_fasta'])

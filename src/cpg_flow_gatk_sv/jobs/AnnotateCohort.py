@@ -7,7 +7,7 @@ if TYPE_CHECKING:
 
 
 def create_annotate_cohort_job(
-    vcf: Path,
+    vcf: str,
     checkpoint: Path,
     out_mt: Path,
     job_attrs: dict,

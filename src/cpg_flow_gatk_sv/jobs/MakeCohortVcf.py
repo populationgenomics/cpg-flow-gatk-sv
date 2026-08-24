@@ -11,9 +11,9 @@ if TYPE_CHECKING:
 def create_makecohortvcf_jobs(
     multicohort: targets.MultiCohort,
     pedigree_input: str,
-    gatherbatchevidence_outputs: dict[str, Path],
-    genotypebatch_outputs: dict[str, Path],
-    filterbatch_outputs: dict[str, Path],
+    gatherbatchevidence_outputs: dict[str, dict[str, Path]],
+    genotypebatch_outputs: dict[str, dict[str, Path]],
+    filterbatch_outputs: dict[str, dict[str, Path]],
     outputs: dict[str, Path],
 ) -> list['BashJob']:
     fasta_file = config.config_retrieve(['workflow', 'ref_fasta'])
