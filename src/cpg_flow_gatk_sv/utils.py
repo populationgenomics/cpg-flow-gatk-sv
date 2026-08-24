@@ -55,7 +55,6 @@ GET_ACTIVE_SGS = gql(
 )
 
 
-
 class CromwellJobSizes(Enum):
     """
     Enum for polling intervals
