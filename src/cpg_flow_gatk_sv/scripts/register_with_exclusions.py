@@ -13,13 +13,12 @@ def read_file_lines(filepath: str) -> list[str]:
 
 
 def main(
-        dataset: str,
-        output: str,
-        stage: str,
-        analysis_type: str,
-        exclusion_file: str,
-        sg_file: str,
-        meta_labels: list[str],
+    dataset: str,
+    output: str,
+    analysis_type: str,
+    exclusion_file: str,
+    sg_file: str,
+    meta_labels: list[str],
 ):
     exclusions = read_file_lines(exclusion_file)
     sgs = read_file_lines(sg_file)
@@ -30,7 +29,7 @@ def main(
     meta = {'sequencing_type': 'genome', 'exclusions': relevant_exclusions}
 
     # add any meta labels from CLI
-    for each_kv in  meta_labels:
+    for each_kv in meta_labels:
         each_key, each_value = each_kv.split('=')
         meta[each_key] = each_value
 
@@ -43,13 +42,12 @@ def main(
     )
 
 
-
 if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('--dataset', help='Project to register the data into.', required=True)
     parser.add_argument('--output', help='Path to Stage output.', required=True)
     parser.add_argument('--atype', help='Analysis type to create.', required=True)
-    parser.add_argument('--sgs',help='Path to a file containing SG IDs.', required=True)
+    parser.add_argument('--sgs', help='Path to a file containing SG IDs.', required=True)
     parser.add_argument('--exclusions', help='Path to excluded-SGs file.', required=True)
     parser.add_argument('--meta', nargs='+', help='Optional, list of "key=value" pairs for the Meta.')
     args = parser.parse_args()
@@ -62,4 +60,3 @@ if __name__ == '__main__':
         exclusion_file=args.exclusions,
         meta_labels=args.meta,
     )
-
