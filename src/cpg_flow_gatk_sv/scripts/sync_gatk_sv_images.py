@@ -22,7 +22,7 @@ def main():
     )
     args = parser.parse_args()
 
-    subprocess.run(  # noqa: S603
+    subprocess.run(
         ['gcloud', 'auth', 'configure-docker', 'australia-southeast1-docker.pkg.dev'],  # noqa: S607
         check=True,
     )

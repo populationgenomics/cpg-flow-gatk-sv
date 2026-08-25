@@ -6,6 +6,7 @@ We need to be careful to read and write compressed versions
 And don't store any substantial amount of data in memory
 """
 
+import gzip
 from argparse import ArgumentParser
 
 
@@ -22,7 +23,6 @@ def rename_sv_ids(input_vcf: str, output_vcf: str, skip_prior_names: bool = Fals
         output_vcf (str): path to write uncompressed edited version to
         skip_prior_names (bool): if True, don't use the TRUTH_VID ID
     """
-    import gzip
 
     # crack open that VCF and have a little sip
     with gzip.open(input_vcf, 'rt') as f, gzip.open(output_vcf, 'wt') as f_out:

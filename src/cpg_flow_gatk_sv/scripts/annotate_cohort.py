@@ -184,7 +184,7 @@ def annotate_cohort_sv(vcf_path: str, out_mt_path: str, gencode_gz: str, checkpo
         algorithms=mt.info.ALGORITHMS,
         cpx_intervals=hl.or_missing(
             hl.is_defined(mt.info.CPX_INTERVALS),
-            mt.info.CPX_INTERVALS.map(lambda x: get_cpx_interval(x)),
+            mt.info.CPX_INTERVALS.map(lambda x: get_cpx_interval(x)),  # noqa: PLW0108
         ),
         sv_types=mt.alleles[1].replace('[<>]', '').split(':', 2),
     )
