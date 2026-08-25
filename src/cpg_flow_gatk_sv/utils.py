@@ -4,6 +4,7 @@ Common methods for all GATK-SV workflows
 
 import functools
 import itertools
+import json
 import re
 from collections import defaultdict
 from enum import Enum
@@ -377,5 +378,31 @@ def write_dataset_sg_ids(dataset: targets.Dataset) -> Path:
         for sg in query_result['project']['sequencingGroups']:
             sg_id = sg['id']
             f.write(f'{sg_id}\n')
+
+    return sgids_list_path
+
+
+@functools.cache
+def make_combined_sgid_file(multicohort: targets.MultiCohort) -> Path:
+    """Create a single list containing all active SG IDs in the MultiCohort."""
+
+    sgids_list_path = multicohort.tmp_prefix() / workflow.get_workflow().output_version / 'mc-sv-sgid-list.txt'
+    if config.config_retrieve(['workflow', 'dry_run'], False):
+        return sgids_list_path
+
+    active_sgids: set[str] = set()
+
+    for each_dataset in multicohort.get_datasets():
+        # a gql query for the SG IDs
+        sg_ids = each_dataset.get_sequencing_group_ids()
+
+        # query for only the Active SGs in this Dataset subset
+        query_result = query(GET_ACTIVE_SGS, variables={'metamist_proj': each_dataset.name, 'only_sgs': sg_ids})
+
+        for sg in query_result['project']['sequencingGroups']:
+            active_sgids.add(sg['id'])
+
+    with sgids_list_path.open('w') as f:
+        json.dump(sorted(active_sgids), f)
 
     return sgids_list_path

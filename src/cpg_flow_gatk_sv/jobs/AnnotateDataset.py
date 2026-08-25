@@ -29,9 +29,9 @@ def create_annotate_dataset_jobs(
     python3 -m cpg_flow_gatk_sv.scripts.register_with_exclusions \\
         --output {mt} \\
         --dataset {dataset_mt} \\
-        --stage AnnotateDataset \\
         --atype sv \\
         --sgs {sgid_file!s} \\
-        --exclusions {exclusion_file!s}
+        --exclusions {exclusion_file!s} \\
+        --meta "stage=AnnotateDataset"
     """)
     return job

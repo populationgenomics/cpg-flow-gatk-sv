@@ -760,7 +760,7 @@ class AnnotateVcfWithStrvctvre(stage.MultiCohortStage):
         return self.make_outputs(multicohort, data=outputs, jobs=job)
 
 
-@stage.stage(required_stages=AnnotateVcfWithStrvctvre, analysis_type='sv')
+@stage.stage(required_stages=AnnotateVcfWithStrvctvre)
 class SpiceUpSvIds(stage.MultiCohortStage):
     """
     Overwrites the GATK-SV assigned IDs with a meaningful ID
@@ -778,8 +778,13 @@ class SpiceUpSvIds(stage.MultiCohortStage):
         output = self.expected_outputs(multicohort)
         input_vcf = inputs.as_str(multicohort, AnnotateVcfWithStrvctvre, 'strvctvre_vcf')
 
+        sgid_file = utils.make_combined_sgid_file(multicohort)
+        exclusion_file = inputs.as_str(multicohort, stage=CombineExclusionLists)
+
         jobs = create_spicy_jobs(
             input_vcf=input_vcf,
+            sg_id_file=sgid_file,
+            exclusions=exclusion_file,
             skip_prior_names=bool(utils.query_for_spicy_vcf(multicohort.analysis_dataset.name)),
             output=str(output),
         )
@@ -839,11 +844,11 @@ class AnnotateDataset(stage.DatasetStage):
         multicohort = workflow.get_multicohort()
 
         cohort_mt = inputs.as_str(target=multicohort, stage=AnnotateCohort)
+
+        dataset_sgid_file = utils.write_dataset_sg_ids(dataset)
         exclusion_file = inputs.as_str(multicohort, stage=CombineExclusionLists)
 
         output = self.expected_outputs(dataset)
-
-        dataset_sgid_file = utils.write_dataset_sg_ids(dataset)
 
         job = create_annotate_dataset_jobs(
             mt=cohort_mt,
@@ -857,7 +862,6 @@ class AnnotateDataset(stage.DatasetStage):
         return self.make_outputs(dataset, data=output, jobs=job)
 
 
-# todo fix registration
 @stage.stage(required_stages=[CombineExclusionLists, AnnotateDataset])
 class AnnotatedDatasetMtToSvVcf(stage.DatasetStage):
     """
@@ -895,13 +899,7 @@ class AnnotatedDatasetMtToSvVcf(stage.DatasetStage):
         return self.make_outputs(dataset, data=output, jobs=job)
 
 
-# todo update the file registration
-@stage.stage(
-    required_stages=[CombineExclusionLists, AnnotateDataset],
-    analysis_type='es-index',
-    analysis_keys=['done_flag'],
-    update_analysis_meta=lambda x: {'seqr-dataset-type': 'SV'},  # noqa: ARG005
-)
+@stage.stage(required_stages=[CombineExclusionLists, AnnotateDataset])
 class MtToEs(stage.DatasetStage):
     """
     Create a Seqr index
@@ -926,6 +924,7 @@ class MtToEs(stage.DatasetStage):
 
         outputs = self.expected_outputs(dataset)
 
+        dataset_sgid_file = utils.write_dataset_sg_ids(dataset)
         exclusion_file = inputs.as_str(workflow.get_multicohort(), stage=CombineExclusionLists)
         mt_path = inputs.as_str(target=dataset, stage=AnnotateDataset)
 
@@ -933,17 +932,15 @@ class MtToEs(stage.DatasetStage):
             dataset=dataset,
             mt_path=mt_path,
             outputs=outputs,
-            excluded_sgs=exclusion_file,
+            sgid_file=dataset_sgid_file,
+            exclusion_file=exclusion_file,
             job_attrs=self.get_job_attrs(target=dataset) | {'tool': 'hail'},
         )
 
         return self.make_outputs(dataset, data=outputs, jobs=job_or_none)
 
 
-@stage.stage(
-    required_stages=[CombineExclusionLists, SpiceUpSvIds],
-    analysis_type='single_dataset_sv_annotated',
-)
+@stage.stage(required_stages=[CombineExclusionLists, SpiceUpSvIds])
 class SplitAnnotatedSvVcfByDataset(stage.DatasetStage):
     """
     takes the whole MultiCohort annotated VCF
@@ -966,7 +963,8 @@ class SplitAnnotatedSvVcfByDataset(stage.DatasetStage):
         job = create_split_vcf_by_dataset_job(
             dataset=dataset,
             input_vcf=input_vcf,
-            dataset_sgid_file=dataset_sgid_file,
+            dataset_sgids=dataset_sgid_file,
+            exclusions=exclusion_file,
             output=str(output),
             job_attrs=self.get_job_attrs(dataset),
         )

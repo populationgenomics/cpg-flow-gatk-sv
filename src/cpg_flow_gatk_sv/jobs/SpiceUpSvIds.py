@@ -8,6 +8,8 @@ if TYPE_CHECKING:
 
 def create_spicy_jobs(
     input_vcf: str,
+    sg_id_file: str,
+    exclusions: str,
     skip_prior_names: bool,
     output: str,
 ) -> list['BashJob']:
@@ -38,4 +40,19 @@ def create_spicy_jobs(
 
     # get the output root to write to
     hail_batch.get_batch().write_output(bcftools_job.output, output.removesuffix('.vcf.bgz'))
-    return [job, bcftools_job]
+
+    registration = hail_batch.get_batch().new_bash_job('Register Spicy VCF.')
+    registration.depends_on(bcftools_job)
+    registration.image(config.config_retrieve(['workflow', 'driver_image']))
+    dataset = config.config_retrieve(['workflow', 'dataset'])
+    registration.command(f"""
+    python3 -m cpg_flow_gatk_sv.scripts.register_with_exclusions \\
+        --output {output!s} \\
+        --dataset {dataset} \\
+        --atype sv \\
+        --sgs {sg_id_file!s} \\
+        --exclusions {exclusions!s} \\
+        --meta "stage=SpiceUpSvIds"
+    """)
+
+    return [job, bcftools_job, registration]
