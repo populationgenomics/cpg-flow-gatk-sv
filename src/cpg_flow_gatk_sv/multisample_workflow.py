@@ -842,12 +842,8 @@ class AnnotateDataset(stage.DatasetStage):
             inputs ():
         """
 
-        # only create dataset MTs for datasets specified in the config
-        if dataset.name not in config.config_retrieve(['workflow', 'write_mt_for_datasets'], default=[]):
-            loguru.logger.info(f'Skipping AnnotateDatasetStage mt subsetting for {dataset.name}')
-            return None
-
         multicohort = workflow.get_multicohort()
+
         cohort_mt = inputs.as_str(target=multicohort, stage=AnnotateCohort)
         exclusion_file = inputs.as_str(multicohort, stage=CombineExclusionLists)
 
@@ -882,9 +878,9 @@ class AnnotatedDatasetMtToSvVcf(stage.DatasetStage):
 
     def queue_jobs(self, dataset: targets.Dataset, inputs: stage.StageInput) -> stage.StageOutput | None:
         """Run a MT -> VCF extraction on selected cohorts - only run this on manually defined list of Datasets."""
+
         # only run this selectively, most datasets it's not required
-        eligible_datasets = config.config_retrieve(['workflow', 'write_vcf'])
-        if dataset.name not in eligible_datasets:
+        if dataset.name not in config.config_retrieve(['workflow', 'write_vcf']):
             return None
 
         output = self.expected_outputs(dataset)
@@ -926,15 +922,12 @@ class MtToEs(stage.DatasetStage):
         """
         Uses the non-DataProc MT-to-ES conversion script
         """
-        # only create the elasticsearch index for the datasets specified in the config
-        if dataset.name not in config.config_retrieve(['workflow', 'create_es_index_for_datasets'], default=[]):
-            loguru.logger.info(f'Skipping SV ES index creation for {dataset}')
-            return None
 
         outputs = self.expected_outputs(dataset)
 
         # get the absolute path to the MT
         mt_path = inputs.as_str(target=dataset, stage=AnnotateDataset)
+
         job_or_none = create_mt_to_es_job(
             dataset=dataset,
             mt_path=mt_path,
