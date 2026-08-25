@@ -14,6 +14,7 @@ def create_annotate_dataset_jobs(
     exclusion_file: str,
     job_attrs: dict,
 ) -> 'BashJob':
+
     job = hail_batch.get_batch().new_bash_job('Annotate dataset', job_attrs)
     job.image(config.config_retrieve(['workflow', 'driver_image']))
     job.command(f"""
@@ -23,5 +24,14 @@ def create_annotate_dataset_jobs(
         --output {mt_out!s} \\
         --sample_id_file {sgid_file} \\
         --exclusion_file {exclusion_file!s}
+    """)
+    job.command(f"""
+    python3 -m cpg_flow_gatk_sv.scripts.register_with_exclusions \\
+        --output {mt} \\
+        --dataset {dataset_mt} \\
+        --stage AnnotateDataset \\
+        --atype sv \\
+        --sgs {sgid_file!s} \\
+        --exclusions {exclusion_file!s}
     """)
     return job
