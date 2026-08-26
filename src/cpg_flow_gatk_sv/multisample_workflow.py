@@ -660,9 +660,7 @@ class UpdateStructuralVariantIDs(stage.MultiCohortStage):
         return self.make_outputs(multicohort, data=outputs, jobs=jobs)
 
 
-@stage.stage(
-    required_stages=[FilterGenotypes, UpdateStructuralVariantIDs],
-)
+@stage.stage(required_stages=[FilterGenotypes, UpdateStructuralVariantIDs])
 class FilterWham(stage.MultiCohortStage):
     """
     Filters the VCF to remove deletions only called by Wham
@@ -692,9 +690,7 @@ class FilterWham(stage.MultiCohortStage):
         return self.make_outputs(multicohort, data=output, jobs=job)
 
 
-@stage.stage(
-    required_stages=[FilterWham, MakeMultiCohortCombinedPed],
-)
+@stage.stage(required_stages=[FilterWham, MakeMultiCohortCombinedPed])
 class AnnotateVcf(stage.MultiCohortStage):
     """
     Add annotations, such as the inferred function and allele frequencies of variants,
@@ -760,7 +756,7 @@ class AnnotateVcfWithStrvctvre(stage.MultiCohortStage):
         return self.make_outputs(multicohort, data=outputs, jobs=job)
 
 
-@stage.stage(required_stages=AnnotateVcfWithStrvctvre)
+@stage.stage(required_stages=[AnnotateVcfWithStrvctvre, CombineExclusionLists])
 class SpiceUpSvIds(stage.MultiCohortStage):
     """
     Overwrites the GATK-SV assigned IDs with a meaningful ID
@@ -855,6 +851,7 @@ class AnnotateDataset(stage.DatasetStage):
             sgid_file=dataset_sgid_file,
             mt_out=str(output),
             dataset_mt=self.tmp_prefix / f'{dataset.name}_subset.mt',
+            dataset=dataset.name,
             job_attrs=self.get_job_attrs(dataset),
             exclusion_file=exclusion_file,
         )

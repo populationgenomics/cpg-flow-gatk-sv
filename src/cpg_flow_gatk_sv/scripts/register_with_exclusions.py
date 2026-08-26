@@ -49,7 +49,7 @@ if __name__ == '__main__':
     parser.add_argument('--atype', help='Analysis type to create.', required=True)
     parser.add_argument('--sgs', help='Path to a file containing SG IDs.', required=True)
     parser.add_argument('--exclusions', help='Path to excluded-SGs file.', required=True)
-    parser.add_argument('--meta', nargs='+', help='Optional, list of "key=value" pairs for the Meta.')
+    parser.add_argument('--meta', nargs='+', help='Optional, list of "key=value" pairs for the Meta.', default=[])
     args = parser.parse_args()
 
     main(

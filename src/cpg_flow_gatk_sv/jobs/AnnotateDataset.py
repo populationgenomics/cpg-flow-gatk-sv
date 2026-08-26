@@ -11,6 +11,7 @@ def create_annotate_dataset_jobs(
     sgid_file: Path,
     mt_out: str,
     dataset_mt: Path,
+    dataset: str,
     exclusion_file: str,
     job_attrs: dict,
 ) -> 'BashJob':
@@ -27,8 +28,8 @@ def create_annotate_dataset_jobs(
     """)
     job.command(f"""
     python3 -m cpg_flow_gatk_sv.scripts.register_with_exclusions \\
-        --output {mt} \\
-        --dataset {dataset_mt} \\
+        --output {mt_out} \\
+        --dataset {dataset} \\
         --atype sv \\
         --sgs {sgid_file!s} \\
         --exclusions {exclusion_file!s} \\

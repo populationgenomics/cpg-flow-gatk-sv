@@ -402,7 +402,8 @@ def make_combined_sgid_file(multicohort: targets.MultiCohort) -> Path:
         for sg in query_result['project']['sequencingGroups']:
             active_sgids.add(sg['id'])
 
-    with sgids_list_path.open('w') as f:
-        json.dump(sorted(active_sgids), f)
+    with sgids_list_path.open('w') as f_handle:
+        for sg_id in sorted(active_sgids):
+            f_handle.write(f'{sg_id}\n')
 
     return sgids_list_path
