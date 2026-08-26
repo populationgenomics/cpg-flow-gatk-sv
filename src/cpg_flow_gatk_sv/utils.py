@@ -4,7 +4,6 @@ Common methods for all GATK-SV workflows
 
 import functools
 import itertools
-import json
 import re
 from collections import defaultdict
 from enum import Enum
