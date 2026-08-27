@@ -11,7 +11,7 @@ def create_annotate_dataset_jobs(
     sgid_file: Path,
     mt_out: str,
     dataset_mt: Path,
-    exclusion_file: Path,
+    exclusion_file: str,
     job_attrs: dict,
 ) -> 'BashJob':
     job = hail_batch.get_batch().new_bash_job('Annotate dataset', job_attrs)
@@ -20,8 +20,8 @@ def create_annotate_dataset_jobs(
     python3 -m cpg_flow_gatk_sv.scripts.annotate_dataset \\
         --mt {mt} \\
         --dataset_mt {dataset_mt} \\
-        --output {mt_out} \\
+        --output {mt_out!s} \\
         --sample_id_file {sgid_file} \\
-        --exclusion_file {exclusion_file}
+        --exclusion_file {exclusion_file!s}
     """)
     return job

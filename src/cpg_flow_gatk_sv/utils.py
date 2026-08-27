@@ -41,6 +41,19 @@ VCF_QUERY = gql(
 """,
 )
 
+GET_ACTIVE_SGS = gql(
+    """
+    query SGQuery($metamist_proj: String!, $only_sgs: [String!]!){
+        project(name: $metamist_proj) {
+            sequencingGroups(id: { in_: $only_sgs, activeOnly: {eq: true}}) {
+                id
+                active
+            }
+        }
+    }
+    """,
+)
+
 
 class CromwellJobSizes(Enum):
     """
@@ -345,18 +358,24 @@ def write_dataset_sg_ids(dataset: targets.Dataset) -> Path:
     For a given dataset, write all its SGs to a file.
     Make this path specific to the dataset and run, so we can use it in multiple jobs
 
+    New behaviour - remove any SG IDs which are marked as inactive
+
     Args:
-        dataset ():
-
-    Returns:
-
+        dataset (cpg-flow.targets.Dataset):
     """
     sgids_list_path = dataset.tmp_prefix() / workflow.get_workflow().output_version / 'sv-sgid-list.txt'
     if config.config_retrieve(['workflow', 'dry_run'], False):
         return sgids_list_path
 
+    # a gql query for the SG IDs
+    sg_ids = dataset.get_sequencing_group_ids()
+
+    # query for only the Active SGs in this Dataset subset
+    query_result = query(GET_ACTIVE_SGS, variables={'metamist_proj': dataset.name, 'only_sgs': sg_ids})
+
     with sgids_list_path.open('w') as f:
-        for sgid in dataset.get_sequencing_group_ids():
-            f.write(f'{sgid}\n')
+        for sg in query_result['project']['sequencingGroups']:
+            sg_id = sg['id']
+            f.write(f'{sg_id}\n')
 
     return sgids_list_path

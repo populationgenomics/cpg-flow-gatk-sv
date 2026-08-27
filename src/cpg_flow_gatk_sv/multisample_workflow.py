@@ -826,8 +826,7 @@ class AnnotateCohort(stage.MultiCohortStage):
 )
 class AnnotateDataset(stage.DatasetStage):
     """
-    Subset the MT to be this Dataset only
-    Then work up all the genotype values
+    Subset the MT to be this Dataset only, then work up all the genotype values.
     """
 
     def expected_outputs(self, dataset: targets.Dataset) -> Path:
@@ -842,6 +841,7 @@ class AnnotateDataset(stage.DatasetStage):
             dataset (Dataset): SGIDs specific to this dataset/project
             inputs ():
         """
+
         # only create dataset MTs for datasets specified in the config
         if dataset.name not in config.config_retrieve(['workflow', 'write_mt_for_datasets'], default=[]):
             loguru.logger.info(f'Skipping AnnotateDatasetStage mt subsetting for {dataset.name}')
@@ -858,7 +858,7 @@ class AnnotateDataset(stage.DatasetStage):
         job = create_annotate_dataset_jobs(
             mt=cohort_mt,
             sgid_file=dataset_sgid_file,
-            mt_out=output,
+            mt_out=str(output),
             dataset_mt=self.tmp_prefix / f'{dataset.name}_subset.mt',
             job_attrs=self.get_job_attrs(dataset),
             exclusion_file=exclusion_file,
