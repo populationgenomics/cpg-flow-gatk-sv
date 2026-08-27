@@ -660,10 +660,7 @@ class UpdateStructuralVariantIDs(stage.MultiCohortStage):
         return self.make_outputs(multicohort, data=outputs, jobs=jobs)
 
 
-@stage.stage(
-    required_stages=[FilterGenotypes, UpdateStructuralVariantIDs],
-    analysis_type='sv',
-)
+@stage.stage(required_stages=[FilterGenotypes, UpdateStructuralVariantIDs])
 class FilterWham(stage.MultiCohortStage):
     """
     Filters the VCF to remove deletions only called by Wham
@@ -693,11 +690,7 @@ class FilterWham(stage.MultiCohortStage):
         return self.make_outputs(multicohort, data=output, jobs=job)
 
 
-@stage.stage(
-    required_stages=[FilterWham, MakeMultiCohortCombinedPed],
-    analysis_type='sv',
-    analysis_keys=['annotated_vcf'],
-)
+@stage.stage(required_stages=[FilterWham, MakeMultiCohortCombinedPed])
 class AnnotateVcf(stage.MultiCohortStage):
     """
     Add annotations, such as the inferred function and allele frequencies of variants,
@@ -763,7 +756,7 @@ class AnnotateVcfWithStrvctvre(stage.MultiCohortStage):
         return self.make_outputs(multicohort, data=outputs, jobs=job)
 
 
-@stage.stage(required_stages=AnnotateVcfWithStrvctvre, analysis_type='sv')
+@stage.stage(required_stages=[AnnotateVcfWithStrvctvre, CombineExclusionLists])
 class SpiceUpSvIds(stage.MultiCohortStage):
     """
     Overwrites the GATK-SV assigned IDs with a meaningful ID
@@ -781,8 +774,13 @@ class SpiceUpSvIds(stage.MultiCohortStage):
         output = self.expected_outputs(multicohort)
         input_vcf = inputs.as_str(multicohort, AnnotateVcfWithStrvctvre, 'strvctvre_vcf')
 
+        sgid_file = utils.make_combined_sgid_file(multicohort)
+        exclusion_file = inputs.as_str(multicohort, stage=CombineExclusionLists)
+
         jobs = create_spicy_jobs(
             input_vcf=input_vcf,
+            sg_id_file=sgid_file,
+            exclusions=exclusion_file,
             skip_prior_names=bool(utils.query_for_spicy_vcf(multicohort.analysis_dataset.name)),
             output=str(output),
         )
@@ -790,7 +788,7 @@ class SpiceUpSvIds(stage.MultiCohortStage):
         return self.make_outputs(multicohort, data=output, jobs=jobs)
 
 
-@stage.stage(required_stages=SpiceUpSvIds, analysis_type='sv')
+@stage.stage(required_stages=SpiceUpSvIds)
 class AnnotateCohort(stage.MultiCohortStage):
     """
     First step to transform annotated SV callset data into a seqr ready format
@@ -820,10 +818,7 @@ class AnnotateCohort(stage.MultiCohortStage):
         return self.make_outputs(multicohort, data=output, jobs=job)
 
 
-@stage.stage(
-    required_stages=[CombineExclusionLists, AnnotateCohort],
-    analysis_type='sv',
-)
+@stage.stage(required_stages=[CombineExclusionLists, AnnotateCohort])
 class AnnotateDataset(stage.DatasetStage):
     """
     Subset the MT to be this Dataset only, then work up all the genotype values.
@@ -842,24 +837,21 @@ class AnnotateDataset(stage.DatasetStage):
             inputs ():
         """
 
-        # only create dataset MTs for datasets specified in the config
-        if dataset.name not in config.config_retrieve(['workflow', 'write_mt_for_datasets'], default=[]):
-            loguru.logger.info(f'Skipping AnnotateDatasetStage mt subsetting for {dataset.name}')
-            return None
-
         multicohort = workflow.get_multicohort()
+
         cohort_mt = inputs.as_str(target=multicohort, stage=AnnotateCohort)
+
+        dataset_sgid_file = utils.write_dataset_sg_ids(dataset)
         exclusion_file = inputs.as_str(multicohort, stage=CombineExclusionLists)
 
         output = self.expected_outputs(dataset)
-
-        dataset_sgid_file = utils.write_dataset_sg_ids(dataset)
 
         job = create_annotate_dataset_jobs(
             mt=cohort_mt,
             sgid_file=dataset_sgid_file,
             mt_out=str(output),
             dataset_mt=self.tmp_prefix / f'{dataset.name}_subset.mt',
+            dataset=dataset.name,
             job_attrs=self.get_job_attrs(dataset),
             exclusion_file=exclusion_file,
         )
@@ -867,7 +859,7 @@ class AnnotateDataset(stage.DatasetStage):
         return self.make_outputs(dataset, data=output, jobs=job)
 
 
-@stage.stage(required_stages=[AnnotateDataset], analysis_type='custom', analysis_keys=['vcf'])
+@stage.stage(required_stages=[CombineExclusionLists, AnnotateDataset])
 class AnnotatedDatasetMtToSvVcf(stage.DatasetStage):
     """
     Take the per-dataset annotated MT and write out as a VCF
@@ -882,29 +874,29 @@ class AnnotatedDatasetMtToSvVcf(stage.DatasetStage):
 
     def queue_jobs(self, dataset: targets.Dataset, inputs: stage.StageInput) -> stage.StageOutput | None:
         """Run a MT -> VCF extraction on selected cohorts - only run this on manually defined list of Datasets."""
+
         # only run this selectively, most datasets it's not required
-        eligible_datasets = config.config_retrieve(['workflow', 'write_vcf'])
-        if dataset.name not in eligible_datasets:
+        if dataset.name not in config.config_retrieve(['workflow', 'write_vcf']):
             return None
 
         output = self.expected_outputs(dataset)
 
+        dataset_sgid_file = utils.write_dataset_sg_ids(dataset)
+        exclusion_file = inputs.as_str(workflow.get_multicohort(), stage=CombineExclusionLists)
         mt_path = inputs.as_str(target=dataset, stage=AnnotateDataset)
 
         job = cohort_to_vcf_job(
+            dataset=dataset.name,
             input_mt=mt_path,
+            dataset_sgids=dataset_sgid_file,
+            exclusions=exclusion_file,
             output_vcf=output,
             job_attrs=self.get_job_attrs(dataset),
         )
         return self.make_outputs(dataset, data=output, jobs=job)
 
 
-@stage.stage(
-    required_stages=[AnnotateDataset],
-    analysis_type='es-index',
-    analysis_keys=['done_flag'],
-    update_analysis_meta=lambda x: {'seqr-dataset-type': 'SV'},  # noqa: ARG005
-)
+@stage.stage(required_stages=[CombineExclusionLists, AnnotateDataset])
 class MtToEs(stage.DatasetStage):
     """
     Create a Seqr index
@@ -926,29 +918,26 @@ class MtToEs(stage.DatasetStage):
         """
         Uses the non-DataProc MT-to-ES conversion script
         """
-        # only create the elasticsearch index for the datasets specified in the config
-        if dataset.name not in config.config_retrieve(['workflow', 'create_es_index_for_datasets'], default=[]):
-            loguru.logger.info(f'Skipping SV ES index creation for {dataset}')
-            return None
 
         outputs = self.expected_outputs(dataset)
 
-        # get the absolute path to the MT
+        dataset_sgid_file = utils.write_dataset_sg_ids(dataset)
+        exclusion_file = inputs.as_str(workflow.get_multicohort(), stage=CombineExclusionLists)
         mt_path = inputs.as_str(target=dataset, stage=AnnotateDataset)
+
         job_or_none = create_mt_to_es_job(
             dataset=dataset,
             mt_path=mt_path,
             outputs=outputs,
+            sgid_file=dataset_sgid_file,
+            exclusion_file=exclusion_file,
             job_attrs=self.get_job_attrs(target=dataset) | {'tool': 'hail'},
         )
 
         return self.make_outputs(dataset, data=outputs, jobs=job_or_none)
 
 
-@stage.stage(
-    required_stages=SpiceUpSvIds,
-    analysis_type='single_dataset_sv_annotated',
-)
+@stage.stage(required_stages=[CombineExclusionLists, SpiceUpSvIds])
 class SplitAnnotatedSvVcfByDataset(stage.DatasetStage):
     """
     takes the whole MultiCohort annotated VCF
@@ -966,11 +955,13 @@ class SplitAnnotatedSvVcfByDataset(stage.DatasetStage):
         input_vcf = inputs.as_str(workflow.get_multicohort(), SpiceUpSvIds)
 
         dataset_sgid_file = utils.write_dataset_sg_ids(dataset)
+        exclusion_file = inputs.as_str(workflow.get_multicohort(), stage=CombineExclusionLists)
 
         job = create_split_vcf_by_dataset_job(
             dataset=dataset,
             input_vcf=input_vcf,
-            dataset_sgid_file=dataset_sgid_file,
+            dataset_sgids=dataset_sgid_file,
+            exclusions=exclusion_file,
             output=str(output),
             job_attrs=self.get_job_attrs(dataset),
         )
@@ -989,24 +980,6 @@ def cli_main():
     workflow.run_workflow(
         name='gatk_sv',
         stages=[
-            TrainGcnv,
-            MakeCohortCombinedPed,
-            MakeMultiCohortCombinedPed,
-            GatherBatchEvidence,
-            ClusterBatch,
-            GenerateBatchMetrics,
-            FilterBatch,
-            MergeBatchSites,
-            CombineExclusionLists,
-            GenotypeBatch,
-            MakeCohortVcf,
-            JoinRawCalls,
-            GeneratePloidyTable,
-            FilterGenotypes,
-            AnnotateVcf,
-            AnnotateVcfWithStrvctvre,
-            AnnotateCohort,
-            AnnotateDataset,
             AnnotatedDatasetMtToSvVcf,
             MtToEs,
             SplitAnnotatedSvVcfByDataset,

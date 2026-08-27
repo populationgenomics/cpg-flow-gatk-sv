@@ -28,6 +28,8 @@ def create_mt_to_es_job(
     dataset: targets.Dataset,
     mt_path: str,
     outputs: dict[str, Path],
+    sgid_file: Path,
+    exclusion_file: str,
     job_attrs: dict,
 ) -> 'BashJob | None':
     """
@@ -61,4 +63,13 @@ def create_mt_to_es_job(
             --flag {outputs['done_flag']!s}
     """)
 
+    job.command(f"""
+    python3 -m cpg_flow_gatk_sv.scripts.register_with_exclusions \\
+        --output {outputs['done_flag']!s} \\
+        --dataset {dataset} \\
+        --atype es-index \\
+        --sgs {sgid_file!s} \\
+        --exclusions {exclusion_file!s} \\
+        --meta "seqr-dataset-type=SV" "stage=MtToEs"
+    """)
     return job
