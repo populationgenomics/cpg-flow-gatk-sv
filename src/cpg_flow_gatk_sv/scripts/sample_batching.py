@@ -115,9 +115,9 @@ def batch_sgs(md: pd.DataFrame, min_batch_size: int, max_batch_size: int) -> lis
     md_sex_cov = {sex: np.array_split(md_sex[sex], cov_bins) for sex in SEX_VALS}
 
     # create batches
-    batches = []
+    batches: list[dict] = []
     for cov in range(cov_bins):
-        sample_ids = pd.concat([md_sex_cov['male'][cov], md_sex_cov['female'][cov]])
+        sample_ids: pd.Series[str] = pd.concat([md_sex_cov['male'][cov], md_sex_cov['female'][cov]])  # type: ignore[list-item]
         logger.info(
             f"""
         ---

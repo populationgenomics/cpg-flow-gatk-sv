@@ -460,7 +460,7 @@ class MakeCohortVcf(stage.MultiCohortStage):
         gatherbatchevidence_outputs = inputs.as_dict_by_target(GatherBatchEvidence)
         genotypebatch_outputs = inputs.as_dict_by_target(GenotypeBatch)
         filterbatch_outputs = inputs.as_dict_by_target(FilterBatch)
-        pedigree_input = inputs.as_path(target=multicohort, stage=MakeMultiCohortCombinedPed)
+        pedigree_input = inputs.as_str(target=multicohort, stage=MakeMultiCohortCombinedPed)
 
         outputs = self.expected_outputs(multicohort)
 
@@ -579,11 +579,11 @@ class GeneratePloidyTable(stage.MultiCohortStage):
 
     def queue_jobs(self, multicohort: targets.MultiCohort, inputs: stage.StageInput) -> stage.StageOutput:
         output = self.expected_outputs(multicohort)
-        pedigree_input = inputs.as_path(target=multicohort, stage=MakeMultiCohortCombinedPed)
+        pedigree_input = inputs.as_str(target=multicohort, stage=MakeMultiCohortCombinedPed)
 
         job = create_generate_ploidy_jobs(
             pedigree=pedigree_input,
-            output=output,
+            output=str(output),
         )
 
         return self.make_outputs(multicohort, data=output, jobs=job)
