@@ -43,11 +43,10 @@ VCF_QUERY = gql(
 
 GET_ACTIVE_SGS = gql(
     """
-    query SGQuery($metamist_proj: String!, $only_sgs: [String!]!){
+    query SGQuery($metamist_proj: String!){
         project(name: $metamist_proj) {
-            sequencingGroups(id: { in_: $only_sgs, activeOnly: {eq: true}}) {
+            sequencingGroups(id: {activeOnly: {eq: true}}) {
                 id
-                active
             }
         }
     }
@@ -368,14 +367,16 @@ def write_dataset_sg_ids(dataset: targets.Dataset) -> Path:
         return sgids_list_path
 
     # a gql query for the SG IDs
-    sg_ids = dataset.get_sequencing_group_ids()
+    sg_ids = set(dataset.get_sequencing_group_ids())
 
     # query for only the Active SGs in this Dataset subset
-    query_result = query(GET_ACTIVE_SGS, variables={'metamist_proj': dataset.name, 'only_sgs': sg_ids})
+    query_result = query(GET_ACTIVE_SGS, variables={'metamist_proj': dataset.name})
 
     with sgids_list_path.open('w') as f:
         for sg in query_result['project']['sequencingGroups']:
             sg_id = sg['id']
+            if sg_id not in sg_ids:
+                continue
             f.write(f'{sg_id}\n')
 
     return sgids_list_path
@@ -393,12 +394,16 @@ def make_combined_sgid_file(multicohort: targets.MultiCohort) -> Path:
 
     for each_dataset in multicohort.get_datasets():
         # a gql query for the SG IDs
-        sg_ids = each_dataset.get_sequencing_group_ids()
+        sg_ids = set(each_dataset.get_sequencing_group_ids())
 
         # query for only the Active SGs in this Dataset subset
-        query_result = query(GET_ACTIVE_SGS, variables={'metamist_proj': each_dataset.name, 'only_sgs': sg_ids})
+        query_result = query(GET_ACTIVE_SGS, variables={'metamist_proj': each_dataset.name})
 
         for sg in query_result['project']['sequencingGroups']:
+            sg_id = sg['id']
+            if sg_id not in sg_ids:
+                continue
+
             active_sgids.add(sg['id'])
 
     with sgids_list_path.open('w') as f_handle:
