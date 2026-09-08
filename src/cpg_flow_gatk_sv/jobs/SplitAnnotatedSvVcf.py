@@ -52,7 +52,7 @@ def create_split_vcf_by_dataset_job(
     job2.command(f"""
     python3 -m cpg_flow_gatk_sv.scripts.register_with_exclusions \\
         --output {output!s} \\
-        --dataset {dataset} \\
+        --dataset {dataset.name} \\
         --atype single_dataset_sv_annotated \\
         --sgs {dataset_sgids!s} \\
         --exclusions {exclusions!s} \\
