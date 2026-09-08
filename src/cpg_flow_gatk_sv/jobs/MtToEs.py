@@ -51,7 +51,7 @@ def create_mt_to_es_job(
     job.image(config.config_retrieve(['workflow', 'driver_image'])).cpu(4).memory('lowmem').storage('10Gi')
 
     # and just the name, used after localisation
-    mt_name = mt_path.split('/', maxsplit=1)[-1]
+    mt_name = mt_path.split('/', maxsplit=-1)[-1]
 
     # localise the MT
     job.command(f'gcloud --no-user-output-enabled storage cp -r {mt_path} $BATCH_TMPDIR')
@@ -66,7 +66,7 @@ def create_mt_to_es_job(
     job.command(f"""
     python3 -m cpg_flow_gatk_sv.scripts.register_with_exclusions \\
         --output {outputs['done_flag']!s} \\
-        --dataset {dataset} \\
+        --dataset {dataset.name} \\
         --atype es-index \\
         --sgs {sgid_file!s} \\
         --exclusions {exclusion_file!s} \\
