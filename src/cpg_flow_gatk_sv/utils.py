@@ -47,7 +47,6 @@ GET_ACTIVE_SGS = gql(
         project(name: $metamist_proj) {
             sequencingGroups(id: { in_: $only_sgs}, activeOnly: {eq: true}) {
                 id
-                active
             }
         }
     }
