@@ -7,6 +7,8 @@ import argparse
 import loguru
 
 from cpg_flow import stage, targets, workflow
+from cpg_flow.inputs import get_multicohort
+
 from cpg_flow_gatk_sv import utils
 from cpg_flow_gatk_sv.jobs.AnnotateCohort import create_annotate_cohort_job
 from cpg_flow_gatk_sv.jobs.AnnotateDataset import create_annotate_dataset_jobs
@@ -908,7 +910,9 @@ class MtToEs(stage.DatasetStage):
         Expected to generate a Seqr index, which is not a file
         """
         sequencing_type = config.config_retrieve(['workflow', 'sequencing_type'])
-        index_name = f'{dataset.name}-{sequencing_type}-SV-{workflow.get_workflow().run_timestamp}'.lower()
+        mc_hash = get_multicohort().get_alignment_inputs_hash()[:10]
+        dataset_hash = dataset.get_alignment_inputs_hash()[:10]
+        index_name = f'{dataset.name}-{sequencing_type}-SV-{mc_hash}-{dataset_hash}'.lower()
         return {
             'index_name': index_name,
             'done_flag': dataset.prefix() / 'es' / f'{index_name}.done',
