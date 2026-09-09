@@ -49,6 +49,7 @@ def create_mt_to_es_job(
 
     job = hail_batch.get_batch().new_bash_job(f'Export MT to ES: {dataset.name}', job_attrs)
     job.image(config.config_retrieve(['workflow', 'driver_image'])).cpu(4).memory('lowmem').storage('10Gi')
+    job.spot(False)
 
     # and just the name, used after localisation
     mt_name = mt_path.split('/', maxsplit=-1)[-1]
