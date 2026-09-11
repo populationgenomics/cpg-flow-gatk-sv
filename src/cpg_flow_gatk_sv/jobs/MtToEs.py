@@ -1,4 +1,5 @@
 import functools
+from random import randint
 from typing import TYPE_CHECKING
 
 import loguru
@@ -56,6 +57,11 @@ def create_mt_to_es_job(
 
     # localise the MT
     job.command(f'gcloud --no-user-output-enabled storage cp -r {mt_path} $BATCH_TMPDIR')
+
+    # when all ES export jobs start at once, they have a high failure rate.
+    # generate a random sleep to provide some stagger between jobs.
+    random_sleep = randint(1, 600)
+    job.command(f'sleep {random_sleep}')
 
     job.command(f"""
         python3 -m cpg_flow_gatk_sv.scripts.mt_to_es_export \\
