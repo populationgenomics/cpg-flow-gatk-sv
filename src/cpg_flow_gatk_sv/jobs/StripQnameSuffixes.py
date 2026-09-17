@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
 from cpg_flow import targets
-from cpg_utils import Path, config, hail_batch, to_path
+from cpg_utils import Path, config, hail_batch
 
 if TYPE_CHECKING:
     from hailtop.batch.job import BashJob
@@ -27,9 +27,11 @@ def create_strip_qname_suffix_job(
 
     reference = hail_batch.fasta_res_group(batch)
 
-    cram_path = to_path(str(sg.cram))
-    j.cloudfuse(cram_path.drive, '/bucket', read_only=True)
-    mounted_cram = f'/bucket/{"/".join(cram_path.parts[2:])}'
+    cram_str = str(sg.cram)
+    # gs://bucket-name/path/to/file -> bucket-name, path/to/file
+    parts = cram_str.replace('gs://', '').split('/', 1)
+    j.cloudfuse(parts[0], '/bucket', read_only=True)
+    mounted_cram = f'/bucket/{parts[1]}'
 
     output_cram = str(expected_outputs['cram'])
     output_crai = str(expected_outputs['crai'])
