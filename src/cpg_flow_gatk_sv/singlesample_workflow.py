@@ -9,10 +9,39 @@ from cpg_flow_gatk_sv import utils
 from cpg_flow_gatk_sv.jobs.CreateSampleBatches import create_sample_batches
 from cpg_flow_gatk_sv.jobs.EvidenceQC import create_evidence_qc_jobs
 from cpg_flow_gatk_sv.jobs.GatherSampleEvidence import create_gather_sample_evidence_jobs
+from cpg_flow_gatk_sv.jobs.StripQnameSuffixes import create_strip_qname_suffix_job
 from cpg_utils import Path, config
 
 
+@stage.stage
+class StripQnameSuffixes(stage.SequencingGroupStage):
+    """
+    Strip /1 and /2 QNAME suffixes from CRAMs produced by older sequencing runs.
+
+    These suffixes break mate pairing in downstream GATK-SV WDL tasks that run
+    samtools fastq without collation (e.g. RealignSoftClippedReads).
+
+    Enable with: strip_qname_suffixes = true under [workflow] in the config.
+    Writes cleaned CRAMs to a separate path; originals are never overwritten.
+    """
+
+    def expected_outputs(self, sequencing_group: targets.SequencingGroup) -> dict[str, Path]:
+        prefix = sequencing_group.dataset.prefix() / 'cram' / 'stripped_qnames'
+        return {
+            'cram': prefix / f'{sequencing_group.id}.cram',
+            'crai': prefix / f'{sequencing_group.id}.cram.crai',
+        }
+
+    def queue_jobs(self, sequencing_group: targets.SequencingGroup, inputs: stage.StageInput) -> stage.StageOutput:
+        if not config.config_retrieve(['workflow', 'strip_qname_suffixes'], False):
+            return self.make_outputs(sequencing_group, skipped=True)
+        outputs = self.expected_outputs(sequencing_group)
+        job = create_strip_qname_suffix_job(sg=sequencing_group, expected_outputs=outputs)
+        return self.make_outputs(sequencing_group, data=outputs, jobs=job)
+
+
 @stage.stage(
+    required_stages=StripQnameSuffixes,
     analysis_keys=[f'{caller}_vcf' for caller in utils.get_sv_callers()] if utils.get_sv_callers() else None,
     analysis_type='sv',
 )
@@ -82,9 +111,18 @@ class GatherSampleEvidence(stage.SequencingGroupStage):
 
         outputs = self.expected_outputs(sequencing_group)
 
+        if config.config_retrieve(['workflow', 'strip_qname_suffixes'], False):
+            cram_path = inputs.as_str(sequencing_group, StripQnameSuffixes, 'cram')
+            crai_path = inputs.as_str(sequencing_group, StripQnameSuffixes, 'crai')
+        else:
+            cram_path = None
+            crai_path = None
+
         jobs = create_gather_sample_evidence_jobs(
             sg=sequencing_group,
             expected_outputs=outputs,
+            cram_path=cram_path,
+            crai_path=crai_path,
         )
         return self.make_outputs(sequencing_group, data=outputs, jobs=jobs)
 

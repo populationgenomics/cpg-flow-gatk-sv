@@ -14,12 +14,14 @@ STAGE_NAME: str = 'GatherSampleEvidence'
 def create_gather_sample_evidence_jobs(
     sg: targets.SequencingGroup,
     expected_outputs: dict[str, Path],
+    cram_path: str | None = None,
+    crai_path: str | None = None,
 ) -> list['BashJob']:
     fasta_file = config.config_retrieve(['workflow', 'ref_fasta'])
 
     input_dict: dict[str, Any] = {
-        'bam_or_cram_file': str(sg.cram),
-        'bam_or_cram_index': str(sg.cram) + '.crai',
+        'bam_or_cram_file': cram_path or str(sg.cram),
+        'bam_or_cram_index': crai_path or (str(sg.cram) + '.crai'),
         'cloud_sdk_docker': config.config_retrieve(['images', 'cloud_sdk_docker']),
         'gatk_docker': config.config_retrieve(['images', 'gatk_docker']),
         'gatk_docker_pesr_override': config.config_retrieve(['images', 'gatk_docker_pesr_override']),
