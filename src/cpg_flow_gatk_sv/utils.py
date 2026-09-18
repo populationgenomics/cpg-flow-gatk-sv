@@ -381,16 +381,16 @@ def write_dataset_sg_ids(dataset: targets.Dataset) -> Path:
 
 
 @functools.cache
-def make_combined_sgid_file(multicohort: targets.MultiCohort) -> Path:
+def make_combined_sgid_file(mc: targets.MultiCohort) -> Path:
     """Create a single list containing all active SG IDs in the MultiCohort."""
 
-    sgids_list_path = multicohort.tmp_prefix() / workflow.get_workflow().output_version / 'mc-sv-sgid-list.txt'
+    sgids_list_path = mc.analysis_dataset.tmp_prefix() / workflow.get_workflow().output_version / 'mc-sv-sgid-list.txt'
     if config.config_retrieve(['workflow', 'dry_run'], False):
         return sgids_list_path
 
     active_sgids: set[str] = set()
 
-    for each_dataset in multicohort.get_datasets():
+    for each_dataset in mc.get_datasets():
         # a gql query for the SG IDs
         sg_ids = each_dataset.get_sequencing_group_ids()
 
