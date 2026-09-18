@@ -27,11 +27,10 @@ def create_strip_qname_suffix_job(
 
     reference = hail_batch.fasta_res_group(batch)
 
-    cram_str = str(sg.cram)
-    # gs://bucket-name/path/to/file -> bucket-name, path/to/file
-    parts = cram_str.replace('gs://', '').split('/', 1)
-    j.cloudfuse(parts[0], '/bucket', read_only=True)
-    mounted_cram = f'/bucket/{parts[1]}'
+    input_cram = batch.read_input_group(
+        cram=str(sg.cram),
+        **{'cram.crai': str(sg.cram) + '.crai'},
+    )
 
     output_cram = str(expected_outputs['cram'])
     output_crai = str(expected_outputs['crai'])
@@ -39,7 +38,7 @@ def create_strip_qname_suffix_job(
     awk_strip = r"""awk 'BEGIN{FS=OFS="\t"} !/^@/{sub(/\/[12]$/,"",$1)} {print}'"""
 
     cmd = f"""\
-samtools view -h -T {reference.base} -@ 3 {mounted_cram} | \
+samtools view -h -T {reference.base} -@ 3 {input_cram.cram} | \
 {awk_strip} | \
 samtools view -C -T {reference.base} -@ 3 -o /tmp/cleaned.cram -
 

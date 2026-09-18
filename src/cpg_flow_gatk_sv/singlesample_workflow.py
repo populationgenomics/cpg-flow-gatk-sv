@@ -10,6 +10,7 @@ from cpg_flow_gatk_sv.jobs.CreateSampleBatches import create_sample_batches
 from cpg_flow_gatk_sv.jobs.EvidenceQC import create_evidence_qc_jobs
 from cpg_flow_gatk_sv.jobs.GatherSampleEvidence import create_gather_sample_evidence_jobs
 from cpg_flow_gatk_sv.jobs.StripQnameSuffixes import create_strip_qname_suffix_job
+from cpg_flow_gatk_sv.jobs.TrimAdapters import create_trim_and_realign_jobs
 from cpg_utils import Path, config
 
 
@@ -40,8 +41,35 @@ class StripQnameSuffixes(stage.SequencingGroupStage):
         return self.make_outputs(sequencing_group, data=outputs, jobs=job)
 
 
+@stage.stage
+class TrimAdapters(stage.SequencingGroupStage):
+    """
+    Trim Illumina adapters and poly-G artefacts, then realign with BWA.
+
+    For samples where adapters were not stripped before alignment, causing
+    massive spurious soft-clipping that crashes downstream tools (e.g. Scramble).
+
+    Enable with: trim_adapters = true under [workflow] in the config.
+    Writes realigned CRAMs to a separate path; originals are never overwritten.
+    """
+
+    def expected_outputs(self, sequencing_group: targets.SequencingGroup) -> dict[str, Path]:
+        prefix = sequencing_group.dataset.prefix() / 'cram' / 'adapter_trimmed'
+        return {
+            'cram': prefix / f'{sequencing_group.id}.cram',
+            'crai': prefix / f'{sequencing_group.id}.cram.crai',
+        }
+
+    def queue_jobs(self, sequencing_group: targets.SequencingGroup, inputs: stage.StageInput) -> stage.StageOutput:
+        if not config.config_retrieve(['workflow', 'trim_adapters'], False):
+            return self.make_outputs(sequencing_group, skipped=True)
+        outputs = self.expected_outputs(sequencing_group)
+        jobs = create_trim_and_realign_jobs(sg=sequencing_group, expected_outputs=outputs)
+        return self.make_outputs(sequencing_group, data=outputs, jobs=jobs)
+
+
 @stage.stage(
-    required_stages=StripQnameSuffixes,
+    required_stages=[StripQnameSuffixes, TrimAdapters],
     analysis_keys=[f'{caller}_vcf' for caller in utils.get_sv_callers()] if utils.get_sv_callers() else None,
     analysis_type='sv',
 )
@@ -111,7 +139,10 @@ class GatherSampleEvidence(stage.SequencingGroupStage):
 
         outputs = self.expected_outputs(sequencing_group)
 
-        if config.config_retrieve(['workflow', 'strip_qname_suffixes'], False):
+        if config.config_retrieve(['workflow', 'trim_adapters'], False):
+            cram_path = inputs.as_str(sequencing_group, TrimAdapters, 'cram')
+            crai_path = inputs.as_str(sequencing_group, TrimAdapters, 'crai')
+        elif config.config_retrieve(['workflow', 'strip_qname_suffixes'], False):
             cram_path = inputs.as_str(sequencing_group, StripQnameSuffixes, 'cram')
             crai_path = inputs.as_str(sequencing_group, StripQnameSuffixes, 'crai')
         else:
