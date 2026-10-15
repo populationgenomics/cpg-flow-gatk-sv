@@ -2,7 +2,9 @@
 Common methods for all GATK-SV workflows
 """
 
+import collections
 import functools
+import hashlib
 import itertools
 import re
 from collections import defaultdict
@@ -366,18 +368,21 @@ def write_dataset_sg_ids(dataset: targets.Dataset) -> Path:
     if config.config_retrieve(['workflow', 'dry_run'], False):
         return sgids_list_path
 
-    # a gql query for the SG IDs
-    sg_ids = dataset.get_sequencing_group_ids()
-
-    # query for only the Active SGs in this Dataset subset
-    query_result = query(GET_ACTIVE_SGS, variables={'metamist_proj': dataset.name, 'only_sgs': sg_ids})
-
     with sgids_list_path.open('w') as f:
-        for sg in query_result['project']['sequencingGroups']:
-            sg_id = sg['id']
+        for sg_id in get_active_sg_ids(dataset):
             f.write(f'{sg_id}\n')
 
     return sgids_list_path
+
+
+@functools.cache
+def get_active_sg_ids(dataset: targets.Dataset) -> tuple[str, ...]:
+    """Query metamist for the SG IDs in this Dataset which are still active."""
+    query_result = query(
+        GET_ACTIVE_SGS,
+        variables={'metamist_proj': dataset.name, 'only_sgs': dataset.get_sequencing_group_ids()},
+    )
+    return tuple(sg['id'] for sg in query_result['project']['sequencingGroups'])
 
 
 @functools.cache
@@ -405,3 +410,53 @@ def make_combined_sgid_file(mc: targets.MultiCohort) -> Path:
             f_handle.write(f'{sg_id}\n')
 
     return sgids_list_path
+
+
+@functools.cache
+def get_family_sequencing_groups(dataset: targets.Dataset) -> dict | None:
+    """
+    Get the subset of sequencing groups that are in the specified families for a dataset
+    Families are set in config as workflow.<dataset name>.only_families
+    Returns a dict containing the sequencing groups and a name suffix for the outputs
+    """
+    if not (only_family_ids := set(config.config_retrieve(['workflow', dataset.name, 'only_families'], []))):
+        return None
+
+    loguru.logger.info(f'Finding sequencing groups for families {only_family_ids} in dataset {dataset.name}')
+    family_sg_ids = [sg.id for sg in dataset.get_sequencing_groups() if sg.pedigree.fam_id in only_family_ids]
+    if not family_sg_ids:
+        raise ValueError(f'No sequencing groups found for families {only_family_ids} in dataset {dataset.name}.')
+    loguru.logger.info(f'Keeping {len(family_sg_ids)} SGs from {len(only_family_ids)} families in {dataset.name}')
+
+    h = hashlib.sha256(''.join(sorted(family_sg_ids)).encode()).hexdigest()[:4]
+    name_suffix = f'{len(family_sg_ids)}_sgs-{len(only_family_ids)}_families-{h}'
+
+    return {'family_sg_ids': family_sg_ids, 'name_suffix': name_suffix}
+
+
+def get_participant_id_mapping(dataset: targets.Dataset) -> dict[str, str]:
+    """
+    Map each active SG ID in the Dataset (or its configured family subset) to the participant external ID
+    seqr identifies samples by participant external ID, so fail if any are absent or shared between SGs
+    Matches the mapping used for the SNV/Indel seqr VCFs in cpg-flow-seqr-loader
+    """
+    family_sg_ids = family_sgs['family_sg_ids'] if (family_sgs := get_family_sequencing_groups(dataset)) else None
+    # SGs deactivated after calling are still in the callset, but shouldn't be exported
+    active_sg_ids = set(get_active_sg_ids(dataset))
+    sgs = [
+        sg
+        for sg in dataset.get_sequencing_groups()
+        if sg.id in active_sg_ids and ((family_sg_ids is None) or sg.id in family_sg_ids)
+    ]
+    if not sgs:
+        raise ValueError(f'No active sequencing groups found in dataset {dataset.name}')
+
+    # sg.participant_id silently falls back to the sample external ID, so check the raw value from metamist
+    if missing := [sg.id for sg in sgs if not sg._participant_id]:  # noqa: SLF001
+        raise ValueError(f'SG IDs in {dataset.name} without a participant external ID: {", ".join(missing)}')
+
+    mapping = {sg.id: sg.participant_id for sg in sgs}
+    if duplicates := sorted(pid for pid, count in collections.Counter(mapping.values()).items() if count > 1):
+        raise ValueError(f'Participant external IDs shared by multiple SGs in {dataset.name}: {", ".join(duplicates)}')
+
+    return mapping

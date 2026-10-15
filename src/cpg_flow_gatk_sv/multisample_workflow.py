@@ -28,11 +28,12 @@ from cpg_flow_gatk_sv.jobs.JoinRawCalls import create_joinrawcalls_jobs
 from cpg_flow_gatk_sv.jobs.MakeCohortVcf import create_makecohortvcf_jobs
 from cpg_flow_gatk_sv.jobs.MergeBatchSites import create_mergebatchsites_jobs
 from cpg_flow_gatk_sv.jobs.MtToEs import create_mt_to_es_job
+from cpg_flow_gatk_sv.jobs.SeqrSvVcf import create_seqr_sv_vcf_jobs
 from cpg_flow_gatk_sv.jobs.SpiceUpSvIds import create_spicy_jobs
 from cpg_flow_gatk_sv.jobs.SplitAnnotatedSvVcf import create_split_vcf_by_dataset_job
 from cpg_flow_gatk_sv.jobs.SVConcordance import create_sv_concordance_jobs
 from cpg_flow_gatk_sv.jobs.TrainGCNV import add_train_gcnv_jobs
-from cpg_utils import Path, config
+from cpg_utils import Path, config, to_path
 
 
 @stage.stage
@@ -972,6 +973,52 @@ class SplitAnnotatedSvVcfByDataset(stage.DatasetStage):
         return self.make_outputs(dataset, data=output, jobs=job)
 
 
+@stage.stage(required_stages=[CombineExclusionLists, SpiceUpSvIds])
+class SeqrSvVcf(stage.DatasetStage):
+    """
+    Write a seqr-ready SV VCF for a Dataset, or a subset of its families, from the SpiceUpSvIds callset
+    Samples are identified by participant external ID, and the fields seqr's SV loading pipeline requires are added
+    Only runs for datasets in workflow.write_seqr_vcf_for_datasets
+    Families are subset using workflow.<dataset name>.only_families
+    If workflow.seqr_loading_bucket is set, a copy of the VCF is also written there
+    """
+
+    @staticmethod
+    def output_name(dataset: targets.Dataset) -> str:
+        output_name = f'{workflow.get_workflow().output_version}-{dataset.name}'
+        if family_sgs := utils.get_family_sequencing_groups(dataset):
+            output_name = f'{output_name}-{family_sgs["name_suffix"]}'
+        return f'{output_name}-SV'
+
+    def expected_outputs(self, dataset: targets.Dataset) -> dict[str, Path]:
+        vcf_name = f'{self.output_name(dataset)}.vcf.bgz'
+        outputs = {'vcf': dataset.prefix() / 'seqr_vcf' / vcf_name}
+        if loading_bucket := config.config_retrieve(['workflow', 'seqr_loading_bucket'], None):
+            outputs['loading_vcf'] = to_path(loading_bucket) / vcf_name
+        return outputs
+
+    def queue_jobs(self, dataset: targets.Dataset, inputs: stage.StageInput) -> stage.StageOutput | None:
+        if dataset.name not in config.config_retrieve(['workflow', 'write_seqr_vcf_for_datasets'], default=[]):
+            loguru.logger.info(f'Skipping seqr SV VCF creation for {dataset}')
+            return None
+
+        outputs = self.expected_outputs(dataset)
+        multicohort = workflow.get_multicohort()
+
+        jobs = create_seqr_sv_vcf_jobs(
+            dataset=dataset,
+            input_vcf=inputs.as_str(multicohort, SpiceUpSvIds),
+            sg_to_participant=utils.get_participant_id_mapping(dataset),
+            sample_map_file=dataset.tmp_prefix() / 'seqr_vcf' / f'{self.output_name(dataset)}-participant-ids.tsv',
+            exclusions=inputs.as_str(multicohort, stage=CombineExclusionLists),
+            output_vcf=outputs['vcf'],
+            loading_vcf=outputs.get('loading_vcf'),
+            job_attrs=self.get_job_attrs(dataset),
+        )
+
+        return self.make_outputs(dataset, data=outputs, jobs=jobs)
+
+
 def cli_main():
     """
     CLI entrypoint - starts up the workflow
@@ -986,6 +1033,7 @@ def cli_main():
             AnnotatedDatasetMtToSvVcf,
             MtToEs,
             SplitAnnotatedSvVcfByDataset,
+            SeqrSvVcf,
         ],
         dry_run=args.dry_run,
     )
