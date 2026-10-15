@@ -150,7 +150,7 @@ def resolve_samples(
     if duplicates := sorted(pid for pid, count in Counter(participant_ids).items() if count > 1):
         raise ValueError(f'Participant external IDs shared by multiple SGs: {", ".join(duplicates)}')
 
-    # seqr drops any family where a pedigree member is missing from the VCF
+    # the rest of the family still loads, but seqr will refuse the load if an excluded member already has SV data
     families_missing_members: dict[str, list[str]] = defaultdict(list)
     for sg_id in sorted(set(sample_map) & exclusions):
         participant_id, family_id = sample_map[sg_id]
@@ -262,7 +262,7 @@ def log_summary(stats: RecordStats, resolution: SampleResolution) -> None:
     loguru.logger.info(f'{stats.with_gnomad_vid}/{stats.written} records have a {GNOMAD_TRUTH_VID}')
     for family_id, members in sorted(resolution.families_missing_members.items()):
         loguru.logger.warning(
-            f'Family {family_id} has members excluded by QC, seqr will not load this family: {", ".join(members)}'
+            f'Family {family_id} has members excluded by QC, who will have no SV calls: {", ".join(members)}'
         )
 
 
