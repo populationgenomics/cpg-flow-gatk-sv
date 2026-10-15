@@ -9,12 +9,95 @@ And don't store any substantial amount of data in memory
 import gzip
 from argparse import ArgumentParser
 
+import loguru
+
+
+def make_coordinate_id(l_split: list[str], info_dict: dict[str, str]) -> str:
+    """
+    Generate an ID from the call attributes
+    The new ID compounds Type, Chr & Start, then either end or Chr2 & End2
+
+    Args:
+        l_split (list[str]): the VCF line, split on tabs
+        info_dict (dict[str, str]): the key-value INFO entries
+    """
+    # strip out the "chr" prefix to abbreviate String
+    chrom = l_split[0].removeprefix('chr')
+    start = l_split[1]
+
+    # e.g. <DEL> -> DEL
+    alt_allele = l_split[4][1:-1]
+
+    # maybe there's a second chromosome?
+    if all(key in info_dict for key in ['CHR2', 'END2']):
+        chrom2 = info_dict['CHR2'].removeprefix('chr')
+        end2 = info_dict['END2']
+        # e.g. BND_1-12345_2-67890
+        return f'{alt_allele}_{chrom}-{start}_{chrom2}-{end2}'
+
+    if 'INS' in alt_allele and 'SVLEN' in info_dict:
+        # e.g. INS:ME:ALU_1-12345-67890
+        return f'{alt_allele}_{chrom}-{start}_ins{info_dict["SVLEN"]}'
+
+    # e.g. CNV_1-12345-67890
+    return f'{alt_allele}_{chrom}-{start}-{info_dict["END"]}'
+
+
+def parse_record(line: str) -> tuple[list[str], dict[str, str]]:
+    """
+    Split a VCF record into columns, and its INFO key-value entries into a dict
+
+    Args:
+        line (str): a non-header line from the VCF
+    """
+    # split on tabs, without the newline, which would otherwise end up in the last column's value
+    l_split = line.rstrip('\n').split('\t')
+
+    # some entries are not key-value, so skip them, e.g.
+    # AN_Orig=61;END=56855888;SVTYPE=DUP;BOTHSIDES_SUPPORT;TRUTH_VID=CNV_1-46855888-56855888  # noqa: ERA001
+    info_dict: dict[str, str] = {}
+    for entry in l_split[7].split(';'):
+        if '=' in entry:
+            key, value = entry.split('=')
+            info_dict[key] = value
+    return l_split, info_dict
+
+
+def choose_prior_id_owners(input_vcf: str) -> dict[str, int]:
+    """
+    SVConcordance can match several variants in this callset to the same variant in the previous callset
+    Only one of them can take the previous ID, otherwise the IDs would be duplicated, and e.g. overwrite each other
+    in the ES index. The previous IDs were generated from call attributes, so a variant whose attributes give exactly
+    the previous ID is the best match, even if SVConcordance didn't pair them. Failing that, the first variant in the
+    file which matched the previous ID takes it
+
+    Args:
+        input_vcf (str): path to the VCF
+
+    Returns:
+        dict of {previous ID: index of the variant which takes it}
+    """
+    first_with_coordinate_id: dict[str, int] = {}
+    first_matching_prior_id: dict[str, int] = {}
+    with gzip.open(input_vcf, 'rt') as f:
+        records = (line for line in f if not line.startswith('#'))
+        for index, line in enumerate(records):
+            l_split, info_dict = parse_record(line)
+            first_with_coordinate_id.setdefault(make_coordinate_id(l_split, info_dict), index)
+            if prior_id := info_dict.get('TRUTH_VID'):
+                first_matching_prior_id.setdefault(prior_id, index)
+
+    return {
+        prior_id: first_with_coordinate_id.get(prior_id, index) for prior_id, index in first_matching_prior_id.items()
+    }
+
 
 def rename_sv_ids(input_vcf: str, output_vcf: str, skip_prior_names: bool = False):
     """
     A Python method to call as a PythonJob, edits content of the VCF
     Replaces the standard ID with a guaranteed-unique ID (hopefully)
-    The new ID compounds Type, Chr & Start, then either end or Chr2 & End2
+    Either the matching ID from the previous callset (TRUTH_VID), or one generated from the call attributes
+    See choose_prior_id_owners for which variant takes a previous ID matched by more than one
 
     Writes the file back out to the specified path
 
@@ -24,64 +107,58 @@ def rename_sv_ids(input_vcf: str, output_vcf: str, skip_prior_names: bool = Fals
         skip_prior_names (bool): if True, don't use the TRUTH_VID ID
     """
 
+    # if this matches a previous ID, use that. TRUTH_VID = Truth dataset Variant ID
+    # In this context 'truth' was previous results for consistency. Not a validation truth set
+    # boolean here indicates when we should ignore TRUTH_VID
+    # this occurs when we have not yet created meaningful IDs for this cohort
+    # this reads the VCF an extra time, to decide which variant takes each previous ID
+    owners = {} if skip_prior_names else choose_prior_id_owners(input_vcf)
+
+    used_ids: set[str] = set()
+    prior_ids_kept = 0
+    prior_ids_taken_by_another = 0
+    duplicate_ids = 0
+
     # crack open that VCF and have a little sip
     with gzip.open(input_vcf, 'rt') as f, gzip.open(output_vcf, 'wt') as f_out:
+        index = 0
         for line in f:
             # don't alter current header lines
             if line.startswith('#'):
                 f_out.write(line)
                 continue
 
-            # split on tabs
-            l_split = line.split('\t')
+            l_split, info_dict = parse_record(line)
+            prior_id = None if skip_prior_names else info_dict.get('TRUTH_VID')
 
-            # some entries are not key-value, so skip them, e.g.
-            # AN_Orig=61;END=56855888;SVTYPE=DUP;BOTHSIDES_SUPPORT;TRUTH_VID=CNV_1-46855888-56855888  # noqa: ERA001
-            info_dict: dict[str, str] = {}
-            for entry in l_split[7].split(';'):
-                if '=' in entry:
-                    key, value = entry.split('=')
-                    info_dict[key] = value
-
-            # if this matches a previous ID, use that. TRUTH_VID = Truth dataset Variant ID
-            # In this context 'truth' was previous results for consistency. Not a validation truth set
-            # boolean here indicates when we should ignore TRUTH_VID
-            # this occurs when we have not yet created meaningful IDs for this cohort
-            if info_dict.get('TRUTH_VID') and not skip_prior_names:
-                l_split[2] = info_dict['TRUTH_VID']
-                f_out.write('\t'.join(l_split))
-                continue
-
-            # otherwise generate a new ID
-            # strip out the "chr" prefix to abbreviate String
-            chrom = l_split[0].removeprefix('chr')
-            start = l_split[1]
-
-            # e.g. <DEL> -> DEL
-            alt_allele = l_split[4][1:-1]
-
-            # maybe there's a second chromosome?
-            if all(key in info_dict for key in ['CHR2', 'END2']):
-                chrom2 = info_dict['CHR2'].removeprefix('chr')
-                end2 = info_dict['END2']
-                # e.g. BND_1-12345_2-67890
-                key = f'{alt_allele}_{chrom}-{start}_{chrom2}-{end2}'
-
-            elif 'INS' in alt_allele and 'SVLEN' in info_dict:
-                # e.g. INS:ME:ALU_1-12345-67890
-                key = f'{alt_allele}_{chrom}-{start}_ins{info_dict["SVLEN"]}'
-
+            if prior_id and owners.get(prior_id) == index:
+                new_id = prior_id
+                prior_ids_kept += 1
             else:
-                # e.g. CNV_1-12345-67890
-                key = f'{alt_allele}_{chrom}-{start}-{info_dict["END"]}'
+                if prior_id:
+                    prior_ids_taken_by_another += 1
+                # some manta calls are exactly identical...
+                # we can make them unique by shoving stuff on the end, but we'll have issues
+                # matching exactly to this call in future
+                new_id = make_coordinate_id(l_split, info_dict)
 
-            # some manta calls are exactly identical...
-            # we can make them unique by shoving stuff on the end, but we'll have issues
-            # matching exactly to this call in future
-            l_split[2] = key
+            if new_id in used_ids:
+                duplicate_ids += 1
+            used_ids.add(new_id)
+            l_split[2] = new_id
+            index += 1
 
             # rebuild the line
-            f_out.write('\t'.join(l_split))
+            f_out.write('\t'.join(l_split) + '\n')
+
+    loguru.logger.info(f'{prior_ids_kept} variants kept the ID of their match in the previous callset')
+    if prior_ids_taken_by_another:
+        loguru.logger.info(
+            f'{prior_ids_taken_by_another} variants matched a previous ID taken by a better or earlier match, '
+            'so were given an ID from their call attributes'
+        )
+    if duplicate_ids:
+        loguru.logger.warning(f'{duplicate_ids} variants were given an ID already used in this VCF')
 
 
 if __name__ == '__main__':
