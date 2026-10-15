@@ -7,8 +7,16 @@ if TYPE_CHECKING:
     from hailtop.batch.job import BashJob
 
 
-def write_sample_map(dataset: targets.Dataset, sg_to_participant: dict[str, str], sample_map_file: Path) -> None:
-    """Write a TSV of SG ID, participant external ID and family ID, for every SG to export."""
+def write_sample_files(
+    dataset: targets.Dataset,
+    sg_to_participant: dict[str, str],
+    sample_map_file: Path,
+    sg_id_file: Path,
+) -> None:
+    """
+    For every SG to export, write a TSV of SG ID, participant external ID and family ID
+    and a plain list of SG IDs, for registering the output
+    """
     if config.config_retrieve(['workflow', 'dry_run'], False):
         return
 
@@ -17,29 +25,35 @@ def write_sample_map(dataset: targets.Dataset, sg_to_participant: dict[str, str]
         for sg_id, participant_id in sorted(sg_to_participant.items()):
             handle.write(f'{sg_id}\t{participant_id}\t{family_by_sg[sg_id]}\n')
 
+    with sg_id_file.open('w') as handle:
+        handle.writelines(f'{sg_id}\n' for sg_id in sorted(sg_to_participant))
+
 
 def create_seqr_sv_vcf_jobs(
     dataset: targets.Dataset,
     input_vcf: str,
     sg_to_participant: dict[str, str],
     sample_map_file: Path,
+    sg_id_file: Path,
     exclusions: str,
     output_vcf: Path,
     job_attrs: dict[str, str],
 ) -> list['BashJob']:
     """
     Subset the multicohort SV VCF to this dataset, rewrite it into a format seqr can load, then bgzip and index
+    The output is registered in metamist against the exported SGs, i.e. without the excluded SGs
 
     Args:
         dataset (Dataset): the dataset being exported
         input_vcf (str): the multicohort SpiceUpSvIds VCF
         sg_to_participant (dict): {SG ID: participant external ID} for every SG to export
         sample_map_file (Path): where to write the SG ID -> participant ID -> family ID TSV
+        sg_id_file (Path): where to write the list of SG IDs to export
         exclusions (str): the combined list of SG IDs removed by QC
         output_vcf (Path): where to write the seqr-ready VCF
         job_attrs (dict): attributes for the jobs
     """
-    write_sample_map(dataset, sg_to_participant, sample_map_file)
+    write_sample_files(dataset, sg_to_participant, sample_map_file, sg_id_file)
 
     batch = hail_batch.get_batch()
     local_vcf = batch.read_input(input_vcf)
@@ -93,4 +107,17 @@ def create_seqr_sv_vcf_jobs(
 
     batch.write_output(compress_job.output, str(output_vcf).removesuffix('.vcf.bgz'))
 
-    return [subset_job, rewrite_job, compress_job]
+    register_job = batch.new_bash_job(f'SeqrSvVcf register: {dataset.name}', job_attrs)
+    register_job.image(config.config_retrieve(['workflow', 'driver_image']))
+    register_job.depends_on(compress_job)
+    register_job.command(f"""
+    python3 -m cpg_flow_gatk_sv.scripts.register_with_exclusions \\
+        --output {output_vcf!s} \\
+        --dataset {dataset.name} \\
+        --atype vcf \\
+        --sgs {sg_id_file!s} \\
+        --exclusions {exclusions!s} \\
+        --meta "stage=SeqrSvVcf"
+    """)
+
+    return [subset_job, rewrite_job, compress_job, register_job]

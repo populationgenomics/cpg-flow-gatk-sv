@@ -33,7 +33,7 @@ from cpg_flow_gatk_sv.jobs.SpiceUpSvIds import create_spicy_jobs
 from cpg_flow_gatk_sv.jobs.SplitAnnotatedSvVcf import create_split_vcf_by_dataset_job
 from cpg_flow_gatk_sv.jobs.SVConcordance import create_sv_concordance_jobs
 from cpg_flow_gatk_sv.jobs.TrainGCNV import add_train_gcnv_jobs
-from cpg_utils import Path, config
+from cpg_utils import Path, config, to_path
 
 
 @stage.stage
@@ -980,6 +980,7 @@ class SeqrSvVcf(stage.DatasetStage):
     Samples are identified by participant external ID, and the fields seqr's SV loading pipeline requires are added
     Only runs for datasets in workflow.write_seqr_vcf_for_datasets
     Families are subset using workflow.<dataset name>.only_families
+    The output is registered as a 'vcf' analysis against the exported SGs, i.e. without the QC-excluded SGs
     """
 
     @staticmethod
@@ -999,12 +1000,14 @@ class SeqrSvVcf(stage.DatasetStage):
 
         outputs = self.expected_outputs(dataset)
         multicohort = workflow.get_multicohort()
+        tmp_prefix = dataset.tmp_prefix() / 'seqr_vcf' / self.output_name(dataset)
 
         jobs = create_seqr_sv_vcf_jobs(
             dataset=dataset,
             input_vcf=inputs.as_str(multicohort, SpiceUpSvIds),
             sg_to_participant=utils.get_participant_id_mapping(dataset),
-            sample_map_file=dataset.tmp_prefix() / 'seqr_vcf' / f'{self.output_name(dataset)}-participant-ids.tsv',
+            sample_map_file=to_path(f'{tmp_prefix}-participant-ids.tsv'),
+            sg_id_file=to_path(f'{tmp_prefix}-sg-ids.txt'),
             exclusions=inputs.as_str(multicohort, stage=CombineExclusionLists),
             output_vcf=outputs['vcf'],
             job_attrs=self.get_job_attrs(dataset),
