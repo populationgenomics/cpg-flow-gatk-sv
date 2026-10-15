@@ -25,7 +25,6 @@ def create_seqr_sv_vcf_jobs(
     sample_map_file: Path,
     exclusions: str,
     output_vcf: Path,
-    loading_vcf: Path | None,
     job_attrs: dict[str, str],
 ) -> list['BashJob']:
     """
@@ -38,7 +37,6 @@ def create_seqr_sv_vcf_jobs(
         sample_map_file (Path): where to write the SG ID -> participant ID -> family ID TSV
         exclusions (str): the combined list of SG IDs removed by QC
         output_vcf (Path): where to write the seqr-ready VCF
-        loading_vcf (Path | None): if set, also write a copy here, e.g. in the seqr loading bucket
         job_attrs (dict): attributes for the jobs
     """
     write_sample_map(dataset, sg_to_participant, sample_map_file)
@@ -94,7 +92,5 @@ def create_seqr_sv_vcf_jobs(
     compress_job.command(f'bcftools view {rewrite_job.output} -Oz -W=tbi -o {compress_job.output["vcf.bgz"]}')
 
     batch.write_output(compress_job.output, str(output_vcf).removesuffix('.vcf.bgz'))
-    if loading_vcf:
-        batch.write_output(compress_job.output, str(loading_vcf).removesuffix('.vcf.bgz'))
 
     return [subset_job, rewrite_job, compress_job]

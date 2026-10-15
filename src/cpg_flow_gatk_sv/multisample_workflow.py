@@ -33,7 +33,7 @@ from cpg_flow_gatk_sv.jobs.SpiceUpSvIds import create_spicy_jobs
 from cpg_flow_gatk_sv.jobs.SplitAnnotatedSvVcf import create_split_vcf_by_dataset_job
 from cpg_flow_gatk_sv.jobs.SVConcordance import create_sv_concordance_jobs
 from cpg_flow_gatk_sv.jobs.TrainGCNV import add_train_gcnv_jobs
-from cpg_utils import Path, config, to_path
+from cpg_utils import Path, config
 
 
 @stage.stage
@@ -980,7 +980,6 @@ class SeqrSvVcf(stage.DatasetStage):
     Samples are identified by participant external ID, and the fields seqr's SV loading pipeline requires are added
     Only runs for datasets in workflow.write_seqr_vcf_for_datasets
     Families are subset using workflow.<dataset name>.only_families
-    If workflow.seqr_loading_bucket is set, a copy of the VCF is also written there
     """
 
     @staticmethod
@@ -991,11 +990,7 @@ class SeqrSvVcf(stage.DatasetStage):
         return f'{output_name}-SV'
 
     def expected_outputs(self, dataset: targets.Dataset) -> dict[str, Path]:
-        vcf_name = f'{self.output_name(dataset)}.vcf.bgz'
-        outputs = {'vcf': dataset.prefix() / 'seqr_vcf' / vcf_name}
-        if loading_bucket := config.config_retrieve(['workflow', 'seqr_loading_bucket'], None):
-            outputs['loading_vcf'] = to_path(loading_bucket) / vcf_name
-        return outputs
+        return {'vcf': dataset.prefix() / 'seqr_vcf' / f'{self.output_name(dataset)}.vcf.bgz'}
 
     def queue_jobs(self, dataset: targets.Dataset, inputs: stage.StageInput) -> stage.StageOutput | None:
         if dataset.name not in config.config_retrieve(['workflow', 'write_seqr_vcf_for_datasets'], default=[]):
@@ -1012,7 +1007,6 @@ class SeqrSvVcf(stage.DatasetStage):
             sample_map_file=dataset.tmp_prefix() / 'seqr_vcf' / f'{self.output_name(dataset)}-participant-ids.tsv',
             exclusions=inputs.as_str(multicohort, stage=CombineExclusionLists),
             output_vcf=outputs['vcf'],
-            loading_vcf=outputs.get('loading_vcf'),
             job_attrs=self.get_job_attrs(dataset),
         )
 

@@ -52,7 +52,8 @@ def test_resolve_samples_renames_in_vcf_order_and_drops_unmapped():
     assert resolution.families_missing_members == {}
 
 
-def test_resolve_samples_drops_exclusions_and_reports_their_families():
+def test_resolve_samples_allows_excluded_sgs_absent_from_vcf():
+    # FilterBatch removes outlier SGs from the callset, they're listed in the combined exclusion list
     resolution = resolve_samples(['SG1', 'SG3'], SAMPLE_MAP, exclusions={'SG2'})
     assert resolution.participant_ids == ('P1', 'P3')
     assert resolution.families_missing_members == {'FAM1': ['P2 (SG2)']}

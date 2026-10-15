@@ -20,7 +20,6 @@ This repository contains the following workflows:
 The `SeqrSvVcf` stage in `multisample_workflow` writes one VCF per dataset that seqr's SV loading pipeline accepts. It starts from the `SpiceUpSvIds` callset, renames samples to participant external IDs, and adds the fields seqr requires (`GNOMAD_V4.1_TRUTH_VID`, `SEQR_INTERNAL_TRUTH_VID`, `CONC_ST`). It is configured in the `[workflow]` section:
 
 - `write_seqr_vcf_for_datasets` - the datasets to export. The stage does nothing for any other dataset.
-- `seqr_loading_bucket` - optional. A copy of each VCF is written here too, e.g. `gs://cpg-seqr-cardinal-dev-loading`.
 - `[workflow.<dataset name>] only_families` - optional. Export only these families from the dataset.
 
 The VCF is written to `<dataset prefix>/seqr_vcf/<output version>-<dataset>-SV.vcf.bgz`.
