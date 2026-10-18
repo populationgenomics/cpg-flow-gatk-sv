@@ -765,8 +765,8 @@ class SpiceUpSvIds(stage.MultiCohortStage):
     This new ID is either taken from an equivalent variant ID in the previous callset (found through SVConcordance)
     or a new one is generated based on the call attributes itself
     A boolean flag is used to switch behaviour, based on the truthiness of the return value of query_for_spicy_vcf
-    If a VCF is returned, True, which also means a VCF should have been used in UpdateStructuralVariantIDs
-    If the return is None, False, and the IDs will be generated from the call attributes alone
+    If a VCF is returned, UpdateStructuralVariantIDs has written the previous callset's IDs to TRUTH_VID, so use them
+    If the return is None, ignore TRUTH_VID, and the IDs will be generated from the call attributes alone
     """
 
     def expected_outputs(self, multicohort: targets.MultiCohort) -> Path:
@@ -783,7 +783,7 @@ class SpiceUpSvIds(stage.MultiCohortStage):
             input_vcf=input_vcf,
             sg_id_file=sgid_file,
             exclusions=exclusion_file,
-            skip_prior_names=bool(utils.query_for_spicy_vcf(multicohort.analysis_dataset.name)),
+            skip_prior_names=not utils.query_for_spicy_vcf(multicohort.analysis_dataset.name),
             output=str(output),
         )
 
