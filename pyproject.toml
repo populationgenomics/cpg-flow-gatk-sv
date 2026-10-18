@@ -8,7 +8,7 @@ description="CPG-Flow implementation of the GATK-SV workflow"
 readme = "README.md"
 # currently cpg-flow is pinned to this version
 requires-python = ">=3.10,<3.12"
-version="0.2.5"
+version="0.2.7"
 license={ "file" = "LICENSE" }
 classifiers=[
     'Environment :: Console',
@@ -105,9 +105,10 @@ hail = ["hail"]
 [tool.ruff.lint.per-file-ignores]
 "src/cpg_flow_gatk_sv/singlesample_workflow.py" = ["ARG002"]
 "src/cpg_flow_gatk_sv/multisample_workflow.py" = ["ARG002"]
+"test/*" = ["S101"]
 
 [tool.bumpversion]
-current_version = "0.2.5"
+current_version = "0.2.7"
 parse = "(?P<major>\\d+)\\.(?P<minor>\\d+)\\.(?P<patch>\\d+)"
 serialize = ["{major}.{minor}.{patch}"]
 commit = true
