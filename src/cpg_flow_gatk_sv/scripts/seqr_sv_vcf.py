@@ -24,6 +24,8 @@ from dataclasses import dataclass, field
 
 import loguru
 
+from cpg_utils.config import config_retrieve
+
 GNOMAD_TRUTH_VID = 'GNOMAD_V4.1_TRUTH_VID'
 SEQR_TRUTH_VID = 'SEQR_INTERNAL_TRUTH_VID'
 
@@ -235,7 +237,16 @@ def transform_record(
     if variant_id in {'', '.'}:
         raise ValueError(f'Record at {chrom}:{pos} has no variant ID, which seqr requires')
 
-    validate_alleles(chrom, pos, variant_id, alt, info)
+    # run validation - if we encounter failures in a permissive mode, log instead of failing
+    try:
+        validate_alleles(chrom, pos, variant_id, alt, info)
+    except ValueError as ve:
+        if config_retrieve(['workflow', 'sv_transform_permissive'], False):
+            loguru.logger.warning(ve)
+            return None
+        else:
+            raise ve
+
 
     new_id = unique_id(variant_id, seen_ids)
     seen_ids.add(new_id)
