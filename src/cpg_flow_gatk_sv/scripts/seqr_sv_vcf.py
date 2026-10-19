@@ -244,9 +244,7 @@ def transform_record(
         if config_retrieve(['workflow', 'sv_transform_permissive'], False):
             loguru.logger.warning(ve)
             return None
-        else:
-            raise ve
-
+        raise ve
 
     new_id = unique_id(variant_id, seen_ids)
     seen_ids.add(new_id)
