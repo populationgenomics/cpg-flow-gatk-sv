@@ -257,6 +257,11 @@ def transform_record(
     if info_value(info, GNOMAD_TRUTH_VID):
         stats.with_gnomad_vid += 1
 
+    # we may want to revert this behaviour in future, but SEQR_TRUTH_VID needs a value for Seqr ingestion
+    if info_value(info, SEQR_TRUTH_VID) is None:
+        entry = f'{SEQR_TRUTH_VID}={new_id}'
+        info = entry if info in {'', '.'} else f'{info};{entry}'
+
     samples = [columns[VCF_FIXED_COLUMNS + index] for index in column_indices]
     stats.written += 1
     return '\t'.join([chrom, pos, new_id, *columns[3:7], info, columns[8], *samples]) + '\n'
