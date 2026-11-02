@@ -5,6 +5,7 @@ import pytest
 from cpg_flow_gatk_sv.scripts.seqr_sv_vcf import (
     GNOMAD_TRUTH_VID,
     REQUIRED_HEADER_LINES,
+    SEQR_TRUTH_VID,
     RecordStats,
     main,
     missing_header_lines,
@@ -130,8 +131,9 @@ def test_transform_record_copies_gnomad_id_and_subsets_samples():
     line = record(info=f'END=200;{GNOMAD_FIELD}=gnomAD-SV_v3_DEL_chr1_abc', samples=('0/1:99:1', '0/0:99:2'))
     result = transform_record(line, (1,), GNOMAD_FIELD, set(), stats)
     columns = result.rstrip('\n').split('\t')
-    assert (
-        columns[7] == f'END=200;{GNOMAD_FIELD}=gnomAD-SV_v3_DEL_chr1_abc;{GNOMAD_TRUTH_VID}=gnomAD-SV_v3_DEL_chr1_abc'
+    assert columns[7] == (
+        f'END=200;{GNOMAD_FIELD}=gnomAD-SV_v3_DEL_chr1_abc;{GNOMAD_TRUTH_VID}=gnomAD-SV_v3_DEL_chr1_abc;'
+        f'{SEQR_TRUTH_VID}=DEL_1-100-200'
     )
     assert columns[9:] == ['0/0:99:2']
     assert stats.with_gnomad_vid == 1
@@ -140,6 +142,13 @@ def test_transform_record_copies_gnomad_id_and_subsets_samples():
 def test_transform_record_keeps_existing_gnomad_truth_vid():
     stats = RecordStats()
     info = f'END=200;{GNOMAD_FIELD}=other;{GNOMAD_TRUTH_VID}=kept'
+    result = transform_record(record(info=info), (0,), GNOMAD_FIELD, set(), stats)
+    assert result.split('\t')[7] == f'{info};{SEQR_TRUTH_VID}=DEL_1-100-200'
+
+
+def test_transform_record_keeps_existing_seqr_truth_vid():
+    stats = RecordStats()
+    info = f'END=200;{SEQR_TRUTH_VID}=kept'
     result = transform_record(record(info=info), (0,), GNOMAD_FIELD, set(), stats)
     assert result.split('\t')[7] == info
 
