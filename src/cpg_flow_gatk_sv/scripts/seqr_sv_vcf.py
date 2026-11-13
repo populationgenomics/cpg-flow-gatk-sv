@@ -4,14 +4,18 @@ Rewrite a single-dataset subset of the GATK-SV callset into a VCF which seqr's S
 seqr validates the SV callset against a fixed schema, and identifies samples by participant external ID. This:
     - drops excluded samples, and fails if any other expected sample is absent from the VCF
     - replaces SG IDs with participant external IDs
-    - adds the header definitions seqr requires: GNOMAD_V4.1_TRUTH_VID, SEQR_INTERNAL_TRUTH_VID and CONC_ST
+    - adds header definitions for GNOMAD_V4.1_TRUTH_VID, SEQR_INTERNAL_TRUTH_VID and CONC_ST if absent
     - copies the gnomAD v4.1 SV ID from the SVAnnotate external AF field into GNOMAD_V4.1_TRUTH_VID
     - drops records on contigs seqr doesn't load
     - fails on any ALT allele, or CPX_TYPE, which seqr would reject
     - makes variant IDs unique within the file
 
-SEQR_INTERNAL_TRUTH_VID is declared but left empty, which is correct for a first load into seqr.
-CONC_ST is declared if absent, values are kept where UpdateStructuralVariantIDs populated them.
+SEQR_INTERNAL_TRUTH_VID is set to the record's own ID where absent. seqr's pipeline no longer reads it, as it now
+matches variants against those already loaded using truvari.
+CONC_ST values are kept as SVConcordance wrote them in UpdateStructuralVariantIDs, comparing against the previous
+CPG callset rather than what's loaded in seqr. seqr only uses them for per-genotype new/previous call flags.
+
+seqr loads one VCF per individual, so the SeqrSvVcf stage splits this output by participant afterwards.
 
 The input can be large, so it's streamed line by line. The output is gzip-compressed, not bgzipped.
 """

@@ -37,11 +37,14 @@ def create_seqr_sv_vcf_jobs(
     sg_id_file: Path,
     exclusions: str,
     output_vcf: Path,
+    split_outputs: dict[str, Path],
     job_attrs: dict[str, str],
 ) -> list['BashJob']:
     """
     Subset the multicohort SV VCF to this dataset, rewrite it into a format seqr can load, then bgzip and index
     The output is registered in metamist against the exported SGs, i.e. without the excluded SGs
+    It's also split into one VCF per participant, keeping only that participant's non-ref calls, as seqr loads
+    one VCF per individual. Dropping hom-ref rows stops seqr's haploid handling for males turning them into calls
 
     Args:
         dataset (Dataset): the dataset being exported
@@ -51,6 +54,7 @@ def create_seqr_sv_vcf_jobs(
         sg_id_file (Path): where to write the list of SG IDs to export
         exclusions (str): the combined list of SG IDs removed by QC
         output_vcf (Path): where to write the seqr-ready VCF
+        split_outputs (dict): {SG ID: per-participant VCF path} for every exported SG, i.e. without QC exclusions
         job_attrs (dict): attributes for the jobs
     """
     write_sample_files(dataset, sg_to_participant, sample_map_file, sg_id_file)
@@ -107,6 +111,20 @@ def create_seqr_sv_vcf_jobs(
 
     batch.write_output(compress_job.output, str(output_vcf).removesuffix('.vcf.bgz'))
 
+    # +split names each file after its sample, i.e. the participant external ID, and applies -i to each output
+    split_job = batch.new_bash_job(f'SeqrSvVcf split by participant: {dataset.name}', job_attrs | {'tool': 'bcftools'})
+    split_job.image(config.config_retrieve(['images', 'bcftools']))
+    split_job.storage('10Gi')
+    split_job.command(f'mkdir split && bcftools +split -i \'GT="alt"\' -Oz -o split {compress_job.output["vcf.bgz"]}')
+    # Hail Batch can't write out a directory, so each participant's VCF and index is a separate output
+    for sg_id, output in sorted(split_outputs.items()):
+        split_job.declare_resource_group(**{sg_id: {'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}})
+        split_job.command(
+            f'mv "split/{sg_to_participant[sg_id]}.vcf.gz" {split_job[sg_id]["vcf.gz"]} '
+            f'&& bcftools index -t {split_job[sg_id]["vcf.gz"]}'
+        )
+        batch.write_output(split_job[sg_id], str(output).removesuffix('.vcf.gz'))
+
     register_job = batch.new_bash_job(f'SeqrSvVcf register: {dataset.name}', job_attrs)
     register_job.image(config.config_retrieve(['workflow', 'driver_image']))
     register_job.depends_on(compress_job)
@@ -120,4 +138,4 @@ def create_seqr_sv_vcf_jobs(
         --meta "stage=SeqrSvVcf"
     """)
 
-    return [subset_job, rewrite_job, compress_job, register_job]
+    return [subset_job, rewrite_job, compress_job, split_job, register_job]

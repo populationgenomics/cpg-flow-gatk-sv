@@ -35,6 +35,8 @@ from cpg_flow_gatk_sv.jobs.SVConcordance import create_sv_concordance_jobs
 from cpg_flow_gatk_sv.jobs.TrainGCNV import add_train_gcnv_jobs
 from cpg_utils import Path, config, to_path
 
+COMBINED_EXCLUSION_LIST = 'combined_exclusion_list.txt'
+
 
 @stage.stage
 class MakeCohortCombinedPed(stage.CohortStage):
@@ -349,7 +351,7 @@ class CombineExclusionLists(stage.MultiCohortStage):
         We need this quick stage to run each time
         """
 
-        return self.prefix / 'combined_exclusion_list.txt'
+        return self.prefix / COMBINED_EXCLUSION_LIST
 
     def queue_jobs(self, multicohort: targets.MultiCohort, inputs: stage.StageInput) -> stage.StageOutput:
         """
@@ -981,6 +983,8 @@ class SeqrSvVcf(stage.DatasetStage):
     Only runs for datasets in workflow.write_seqr_vcf_for_datasets
     Families are subset using workflow.<dataset name>.only_families
     The output is registered as a 'vcf' analysis against the exported SGs, i.e. without the QC-excluded SGs
+    It's also split into one VCF per exported participant, which is the form seqr's SV pipeline loads
+    Those outputs are keyed on SG ID, so the exported SGs (i.e. without QC exclusions) are read at planning time
     """
 
     @staticmethod
@@ -990,12 +994,34 @@ class SeqrSvVcf(stage.DatasetStage):
             output_name = f'{output_name}-{family_sgs["name_suffix"]}'
         return f'{output_name}-SV'
 
+    @staticmethod
+    def exported_participants(dataset: targets.Dataset) -> dict[str, str] | None:
+        """{SG ID: participant external ID} for the SGs to export, None if the exclusion list isn't written yet"""
+        if dataset.name not in config.config_retrieve(['workflow', 'write_seqr_vcf_for_datasets'], default=[]):
+            return None
+        exclusions_file = workflow.get_workflow().prefix / CombineExclusionLists.__name__ / COMBINED_EXCLUSION_LIST
+        return utils.get_exported_participants(dataset, exclusions_file)
+
     def expected_outputs(self, dataset: targets.Dataset) -> dict[str, Path]:
-        return {'vcf': dataset.prefix() / 'seqr_vcf' / f'{self.output_name(dataset)}.vcf.bgz'}
+        outputs = {'vcf': dataset.prefix() / 'seqr_vcf' / f'{self.output_name(dataset)}.vcf.bgz'}
+        if output_bucket := config.config_retrieve(['workflow', 'seqr_input_bucket'], None):
+            split_prefix = to_path(output_bucket) / 'seqr_vcf' / self.output_name(dataset)
+        else:
+            split_prefix = dataset.prefix() / 'seqr_vcf' / self.output_name(dataset)
+        for sg_id, participant_id in (self.exported_participants(dataset) or {}).items():
+            outputs[sg_id] = split_prefix / f'{participant_id}.vcf.gz'
+        return outputs
 
     def queue_jobs(self, dataset: targets.Dataset, inputs: stage.StageInput) -> stage.StageOutput | None:
         if dataset.name not in config.config_retrieve(['workflow', 'write_seqr_vcf_for_datasets'], default=[]):
             loguru.logger.info(f'Skipping seqr SV VCF creation for {dataset}')
+            return None
+
+        if (exported_participants := self.exported_participants(dataset)) is None:
+            loguru.logger.warning(
+                f'Skipping seqr SV VCF creation for {dataset}, as the combined exclusion list has not been written. '
+                'Run this stage again once the callset is complete',
+            )
             return None
 
         outputs = self.expected_outputs(dataset)
@@ -1010,6 +1036,7 @@ class SeqrSvVcf(stage.DatasetStage):
             sg_id_file=to_path(f'{tmp_prefix}-sg-ids.txt'),
             exclusions=inputs.as_str(multicohort, stage=CombineExclusionLists),
             output_vcf=outputs['vcf'],
+            split_outputs={sg_id: outputs[sg_id] for sg_id in exported_participants},
             job_attrs=self.get_job_attrs(dataset),
         )
 
