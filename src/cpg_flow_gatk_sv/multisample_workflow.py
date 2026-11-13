@@ -981,6 +981,7 @@ class SeqrSvVcf(stage.DatasetStage):
     Only runs for datasets in workflow.write_seqr_vcf_for_datasets
     Families are subset using workflow.<dataset name>.only_families
     The output is registered as a 'vcf' analysis against the exported SGs, i.e. without the QC-excluded SGs
+    It's also split into one VCF per participant, which is the form seqr's SV pipeline loads
     """
 
     @staticmethod
@@ -991,7 +992,10 @@ class SeqrSvVcf(stage.DatasetStage):
         return f'{output_name}-SV'
 
     def expected_outputs(self, dataset: targets.Dataset) -> dict[str, Path]:
-        return {'vcf': dataset.prefix() / 'seqr_vcf' / f'{self.output_name(dataset)}.vcf.bgz'}
+        return {
+            'vcf': dataset.prefix() / 'seqr_vcf' / f'{self.output_name(dataset)}.vcf.bgz',
+            'per_participant_vcfs': dataset.prefix() / 'seqr_vcf' / self.output_name(dataset),
+        }
 
     def queue_jobs(self, dataset: targets.Dataset, inputs: stage.StageInput) -> stage.StageOutput | None:
         if dataset.name not in config.config_retrieve(['workflow', 'write_seqr_vcf_for_datasets'], default=[]):
@@ -1010,6 +1014,7 @@ class SeqrSvVcf(stage.DatasetStage):
             sg_id_file=to_path(f'{tmp_prefix}-sg-ids.txt'),
             exclusions=inputs.as_str(multicohort, stage=CombineExclusionLists),
             output_vcf=outputs['vcf'],
+            output_split_dir=outputs['per_participant_vcfs'],
             job_attrs=self.get_job_attrs(dataset),
         )
 
