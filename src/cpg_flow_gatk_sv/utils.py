@@ -460,3 +460,20 @@ def get_participant_id_mapping(dataset: targets.Dataset) -> dict[str, str]:
         raise ValueError(f'Participant external IDs shared by multiple SGs in {dataset.name}: {", ".join(duplicates)}')
 
     return mapping
+
+
+@cache
+def get_exported_participants(dataset: targets.Dataset, exclusions_file: Path) -> dict[str, str] | None:
+    """
+    Map each SG exported to seqr to its participant external ID, i.e. the participant mapping without QC exclusions
+    Returns None if the combined exclusion list hasn't been written yet, as the exported SGs aren't known until then
+    """
+    if not utils.exists(exclusions_file):
+        return None
+    with exclusions_file.open() as handle:
+        excluded = {line.strip() for line in handle if line.strip()}
+    return {
+        sg_id: participant_id
+        for sg_id, participant_id in get_participant_id_mapping(dataset).items()
+        if sg_id not in excluded
+    }

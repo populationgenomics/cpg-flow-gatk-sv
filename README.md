@@ -22,7 +22,7 @@ The `SeqrSvVcf` stage in `multisample_workflow` writes one VCF per dataset that 
 - `write_seqr_vcf_for_datasets` - the datasets to export. The stage does nothing for any other dataset.
 - `[workflow.<dataset name>] only_families` - optional. Export only these families from the dataset.
 
-The VCF is written to `<dataset prefix>/seqr_vcf/<output version>-<dataset>-SV.vcf.bgz`. seqr's SV pipeline loads one VCF per individual rather than this multi-sample VCF, so the stage also splits it into `<dataset prefix>/seqr_vcf/<output version>-<dataset>-SV/<participant ID>.vcf.gz`, keeping only each participant's non-ref calls. Pass that directory to seqr as a quoted template, e.g. `--callset-path '<dataset prefix>/seqr_vcf/<output version>-<dataset>-SV/*.vcf.gz'`.
+The VCF is written to `<dataset prefix>/seqr_vcf/<output version>-<dataset>-SV.vcf.bgz`. seqr's SV pipeline loads one VCF per individual rather than this multi-sample VCF, so the stage also splits it into `<dataset prefix>/seqr_vcf/<output version>-<dataset>-SV/<participant ID>.vcf.gz`, keeping only each participant's non-ref calls. Pass that directory to seqr as a quoted template, e.g. `--callset-path '<dataset prefix>/seqr_vcf/<output version>-<dataset>-SV/*.vcf.gz'`. There's one file per exported SG, so SGs excluded by QC have none. seqr loads every member of a family and needs a file for each, so a family with an excluded member won't load. The exported SGs are read from the combined exclusion list when the stage is planned, so the stage is skipped (with a warning) until that list exists.
 
 ## Structure
 

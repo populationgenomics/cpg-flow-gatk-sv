@@ -37,7 +37,7 @@ def create_seqr_sv_vcf_jobs(
     sg_id_file: Path,
     exclusions: str,
     output_vcf: Path,
-    output_split_dir: Path,
+    split_outputs: dict[str, Path],
     job_attrs: dict[str, str],
 ) -> list['BashJob']:
     """
@@ -54,7 +54,7 @@ def create_seqr_sv_vcf_jobs(
         sg_id_file (Path): where to write the list of SG IDs to export
         exclusions (str): the combined list of SG IDs removed by QC
         output_vcf (Path): where to write the seqr-ready VCF
-        output_split_dir (Path): where to write the per-participant VCFs, <participant ID>.vcf.gz
+        split_outputs (dict): {SG ID: per-participant VCF path} for every exported SG, i.e. without QC exclusions
         job_attrs (dict): attributes for the jobs
     """
     write_sample_files(dataset, sg_to_participant, sample_map_file, sg_id_file)
@@ -115,16 +115,15 @@ def create_seqr_sv_vcf_jobs(
     split_job = batch.new_bash_job(f'SeqrSvVcf split by participant: {dataset.name}', job_attrs | {'tool': 'bcftools'})
     split_job.image(config.config_retrieve(['images', 'bcftools']))
     split_job.storage('10Gi')
-    split_job.command(
-        f"""
-        mkdir -p {split_job.output}
-        bcftools +split -i 'GT="alt"' -Oz -o {split_job.output} {compress_job.output['vcf.bgz']}
-        for vcf in {split_job.output}/*.vcf.gz; do
-            bcftools index -t "$vcf"
-        done
-        """
-    )
-    batch.write_output(split_job.output, str(output_split_dir))
+    split_job.command(f'mkdir split && bcftools +split -i \'GT="alt"\' -Oz -o split {compress_job.output["vcf.bgz"]}')
+    # Hail Batch can't write out a directory, so each participant's VCF and index is a separate output
+    for sg_id, output in sorted(split_outputs.items()):
+        split_job.declare_resource_group(**{sg_id: {'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}})
+        split_job.command(
+            f'mv "split/{sg_to_participant[sg_id]}.vcf.gz" {split_job[sg_id]["vcf.gz"]} '
+            f'&& bcftools index -t {split_job[sg_id]["vcf.gz"]}'
+        )
+        batch.write_output(split_job[sg_id], str(output).removesuffix('.vcf.gz'))
 
     register_job = batch.new_bash_job(f'SeqrSvVcf register: {dataset.name}', job_attrs)
     register_job.image(config.config_retrieve(['workflow', 'driver_image']))
