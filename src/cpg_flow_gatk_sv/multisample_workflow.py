@@ -1004,7 +1004,10 @@ class SeqrSvVcf(stage.DatasetStage):
 
     def expected_outputs(self, dataset: targets.Dataset) -> dict[str, Path]:
         outputs = {'vcf': dataset.prefix() / 'seqr_vcf' / f'{self.output_name(dataset)}.vcf.bgz'}
-        split_prefix = dataset.prefix() / 'seqr_vcf' / self.output_name(dataset)
+        if output_bucket := config.config_retrieve(['workflow', 'seqr_input_bucket'], None):
+            split_prefix = to_path(output_bucket) / 'seqr_vcf' / self.output_name(dataset)
+        else:
+            split_prefix = dataset.prefix() / 'seqr_vcf' / self.output_name(dataset)
         for sg_id, participant_id in (self.exported_participants(dataset) or {}).items():
             outputs[sg_id] = split_prefix / f'{participant_id}.vcf.gz'
         return outputs

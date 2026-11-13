@@ -28,8 +28,15 @@ gencode_gtf_file = 'gs://cpg-common-main/references/hg38/v0/gencode_47.gtf.gz'
 # For exporting an Annotated SV VCF for dataset(s)
 write_vcf = []
 
+## seqr VCF export
+## Handles the exporting of individual level VCFs ready for loading into Clickhouse seqr
+
 # For exporting a seqr-ready SV VCF for dataset(s), with samples named by participant external ID (SeqrSvVcf)
 write_seqr_vcf_for_datasets = []
+
+# The bucket where the final individual VCFs are written, save them to the loading bucket for convenience
+seqr_input_bucket = 'gs://cpg-seqr-cardinal-dev-loading'
+
 # Optionally, export only some families from a dataset
 # [workflow.<dataset name>]
 # only_families = ['FAM1', 'FAM2']
